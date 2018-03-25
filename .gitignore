@@ -10,3 +10,4 @@ ext/
 *.xcuserstate
 */xcuserdata/*
 binaries/
+data/
