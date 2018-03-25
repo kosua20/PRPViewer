@@ -16,6 +16,7 @@ ExternalProject_Add(libhsplasma
     DOWNLOAD_COMMAND ""
     SOURCE_DIR ../external/libhsplasma
     INSTALL_DIR ${PROJECT_BINARY_DIR}
+    PATCH_COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_BINARY_DIR}/../external/libhsplasma-patch/plJPEG.cpp ${PROJECT_BINARY_DIR}/../external/libhsplasma/core/Util/
     CMAKE_ARGS 
         -DCMAKE_INSTALL_PREFIX:PATH=<INSTALL_DIR> 
         -DOPENSSL_ROOT_DIR:PATH=/usr/local/opt/openssl)
