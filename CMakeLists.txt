@@ -2,7 +2,7 @@
 cmake_minimum_required(VERSION 2.8)
 include(ExternalProject)
 
-project("project")
+project("PrpViewer")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
 
 # we add the sub-directories that we want CMake to scan
@@ -41,7 +41,7 @@ include_directories(${PROJECT_BINARY_DIR}/include/)
 
 # My project
 file(GLOB project_sources src/*.cpp)
-add_executable(project ${project_sources})
-add_dependencies(project libhsplasma libstring_theory)
-target_link_libraries(project ${HSPLASMA_LIB} ${STRING_THEORY_LIB})
-install(TARGETS project RUNTIME DESTINATION bin)
+add_executable(PrpViewer ${project_sources})
+add_dependencies(PrpViewer libhsplasma libstring_theory)
+target_link_libraries(PrpViewer ${HSPLASMA_LIB} ${STRING_THEORY_LIB})
+install(TARGETS PrpViewer RUNTIME DESTINATION bin)
