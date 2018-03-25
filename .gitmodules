@@ -1,3 +1,0 @@
-[submodule "external/string_theory"]
-	path = external/string_theory
-	url = https://github.com/zrax/string_theory.git
