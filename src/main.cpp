@@ -44,49 +44,22 @@ int main(int argc, char** argv){
 	plResManager rm;
 	plAgeInfo* age;
 	try {
-		//age = new plAgeInfo();
-		hsStream* S;
-		if (plEncryptedStream::IsFileEncrypted(path)) {
-			S = new plEncryptedStream();
-			((plEncryptedStream*)S)->open(path, fmRead, plEncryptedStream::kEncAuto);
-		} 
+		age = new plAgeInfo();
+		age->readFromFile(path);
 		
-		while (!S->eof()) {
-			ST::string_stream line;
-			char c = S->readByte();
-			std::cout << int(c) << " ";
-			while ((c != '\n') && (c != '\r') && !S->eof()) {
-				line.append_char(c);
-				c = S->readByte();
-				std::cout << int(c) << " ";
-			}
-			if (c != '\n' && c != '\r')
-				line.append_char(c);
-			if (c == '\r'){
-				S->readByte(); // Eat the \n in Windows-style EOLs
-				std::cout << int(c) << " ";
-			}
-			std::cout << std::endl;
-			ST::string ln = line.to_string();
-			std::cout << ln.to_std_string() << ":::" << ln.size() << std::endl;
-			std::vector<ST::string> parts = split(ln, '=', 1);
-			ST::string field = parts.at(0).to_lower();
-			std::cout << field.to_std_string() << std::endl;
-			//ST::string value = parts.at(1);
-			std::cout << "nExt" << std::endl;
-			
-		}
-		//age = rm.ReadAge(path, false);
+		
+
+		
 	} catch (hsException& e) {
 		ST::printf(stderr, "{}:{}: {}\n", e.File(), e.Line(), e.what());
 		return 1;
-	}/* catch (std::exception& e) {
-		ST::printf(stderr, "PrcExtract Exception: {}\n", e.what());
+	} catch (std::exception& e) {
+		ST::printf(stderr, "Prc Extract Exception: {}\n", e.what());
 		return 1;
 	} catch (...) {
 		fputs("Undefined error!\n", stderr);
 		return 1;
-	}*/
+	}
 	
 	ST::string outDir = age->getAgeName();
 	std::cout << outDir.to_std_string() << ":" << age->getNumPages() << " pages." << std::endl;
