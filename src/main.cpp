@@ -44,8 +44,7 @@ int main(int argc, char** argv){
 	plResManager rm;
 	plAgeInfo* age;
 	try {
-		age = new plAgeInfo();
-		age->readFromFile(path);
+		age = rm.ReadAge(path, true);
 		
 		
 

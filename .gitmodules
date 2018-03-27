@@ -1,0 +1,3 @@
+[submodule "external/libhsplasma"]
+	path = external/libhsplasma
+	url = https://github.com/kosua20/libhsplasma
