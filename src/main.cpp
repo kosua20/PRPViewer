@@ -11,6 +11,8 @@
 #include <PRP/Object/plCoordinateInterface.h>
 #include <PRP/Geometry/plDrawableSpans.h>
 #include <PRP/Surface/plLayer.h>
+#include <PRP/Surface/plBitmap.h>
+#include <PRP/Surface/plMipmap.h>
 #include <Stream/plEncryptedStream.h>
 #include <Debug/plDebug.h>
 #include <string_theory/stdio>
@@ -72,11 +74,13 @@ void logLocation(plResManager & rm, const plLocation & ploc){
 			if (obj->getCoordInterface().Exists()){
 				coord = plCoordinateInterface::Convert(obj->getCoordInterface()->getObj());
 			}
+			
 			std::cout << "Element " << draw->getNumDrawables() << std::endl;
 			for (size_t i = 0; i < draw->getNumDrawables(); ++i) {
 				if (draw->getDrawableKey(i) == -1){
 					continue;
 				}
+				
 				// A span group multiple objects data/assets.
 				plDrawableSpans* span = plDrawableSpans::Convert(draw->getDrawable(i)->getObj());
 				plDISpanIndex di = span->getDIIndex(draw->getDrawableKey(i));
@@ -98,7 +102,7 @@ void logLocation(plResManager & rm, const plLocation & ploc){
 					plIcicle* ice = (plIcicle*)span->getSpan(di.fIndices[id]);
 					std::vector<plGBufferVertex> verts = span->getVerts(ice);
 					std::vector<unsigned short> indices = span->getIndices(ice);
-					
+					std::cout << "Num uvs: " << span->getBuffer(ice->getGroupIdx())->getNumUVs() << std::endl;
 					for (size_t j = 0; j < verts.size(); j++) {
 						hsVector3 pos;
 						if (coord != NULL){
@@ -111,60 +115,43 @@ void logLocation(plResManager & rm, const plLocation & ploc){
 						outfile << "vn " <<  verts[j].fNormal.X << " " <<  verts[j].fNormal.Z << " " << (- verts[j].fNormal.Y) << std::endl;
 						
 					}
+					
+					bool hasTexture = false;
+					// Find proper uv transformation (we can translate/scale material layers)
+					unsigned int uvwSrc = 0;
+					hsMatrix44 uvwXform;
+					plKey matKey = span->getMaterials()[ice->getMaterialIdx()];
+					if (matKey.Exists()) {
+						hsGMaterial* mat = hsGMaterial::Convert(matKey->getObj(), false);
+						if (mat != NULL && mat->getLayers().size() > 0) {
+							plLayerInterface* lay = plLayerInterface::Convert(mat->getLayers()[0]->getObj(), false);
+							// find lowest underlay UV set.
+							while (lay != NULL && lay->getUnderLay().Exists()){
+								lay = plLayerInterface::Convert(lay->getUnderLay()->getObj(), false);
+							}
+							uvwSrc = lay->getUVWSrc();
+							uvwXform = lay->getTransform();
+							hasTexture = true;
+						}
+					}
+					if(hasTexture){
+						for (size_t j = 0; j < verts.size(); j++) {
+							hsVector3 txUvw = uvwXform.multPoint(verts[j].fUVWs[uvwSrc]);
+							// z will probably always be 0
+							outfile << "vt " << txUvw.X << " " << txUvw.Y << " " << txUvw.Z << std::endl;
+						}
+					}
+					
+					
 					for (size_t j = 0; j < indices.size(); j += 3) {
-						outfile << "f " << indices[j]+1 << "//" << indices[j]+1;
-						outfile <<  " " << indices[j+1]+1 << "//" << indices[j+1]+1;
-						outfile <<  " " << indices[j+2]+1 << "//" << indices[j+2]+1;
+						outfile << "f " << indices[j]+1 << "/" << (hasTexture ? std::to_string(indices[j]+1) : "") << "/" << indices[j]+1;
+						outfile <<  " " << indices[j+1]+1 << "/" << (hasTexture ? std::to_string(indices[j+1]+1) : "") << "/" << indices[j+1]+1;
+						outfile <<  " " << indices[j+2]+1 << "/" << (hasTexture ? std::to_string(indices[j+2]+1) : "") << "/" << indices[j+2]+1;
 						outfile << std::endl;
 					}
 					outfile.close();
-					// Find proper uv transformation (we can translate/scale material layers)
-				//	unsigned int uvwSrc = 0;
-				//	hsMatrix44 uvwXform;
-//					plKey matKey = span->getMaterials()[ice->getMaterialIdx()];
-//					if (matKey.Exists()) {
-//						hsGMaterial* mat = hsGMaterial::Convert(matKey->getObj(), false);
-//						if (mat != NULL && mat->getLayers().size() > 0) {
-//							plLayerInterface* lay = plLayerInterface::Convert(mat->getLayers()[0]->getObj(), false);
-//							// find lowest underlay ?
-//							while (lay != NULL && lay->getUnderLay().Exists())
-//								lay = plLayerInterface::Convert(lay->getUnderLay()->getObj(), false);
-//							uvwSrc = lay->getUVWSrc();
-//							uvwXform = lay->getTransform();
-//						}
-//					}
 					
-					// indices
-//					if (span->getBuffer(ice->getGroupIdx())->getNumUVs() > uvwSrc) {
-//						for (size_t j = 0; j < indices.size(); j += 3) {
-//							/*
-//							 v t n v t n v t n
-//												   indices[j+0] + s_BaseIndex,
-//												   indices[j+0] + s_TexBaseIndex,
-//												   indices[j+0] + s_BaseIndex,
-//												   indices[j+1] + s_BaseIndex,
-//												   indices[j+1] + s_TexBaseIndex,
-//												   indices[j+1] + s_BaseIndex,
-//												   indices[j+2] + s_BaseIndex,
-//												   indices[j+2] + s_TexBaseIndex,
-//												   indices[j+2] + s_BaseIndex
-//							 */
-//						}
-//						s_BaseIndex += ice->getVLength();
-//						s_TexBaseIndex += ice->getVLength();
-//					} else {
-//						for (size_t j = 0; j < indices.size(); j += 3) {
-//
-//							//v n v n v n
-//												 /*  indices[j+0] + s_BaseIndex,
-//												   indices[j+0] + s_BaseIndex,
-//												   indices[j+1] + s_BaseIndex,
-//												   indices[j+1] + s_BaseIndex,
-//												   indices[j+2] + s_BaseIndex,
-//												   indices[j+2] + s_BaseIndex));*/
-//						}
-						//s_BaseIndex += ice->getVLength();
-					//}
+					
 				}
 				
 			}
@@ -172,6 +159,53 @@ void logLocation(plResManager & rm, const plLocation & ploc){
 	}
 	const auto textureKeys = rm.getKeys(ploc, pdUnifiedTypeMap::ClassIndex("plMipmap")); // also support envmap
 	std::cout << textureKeys.size() << " textures." << std::endl;
+	for(const auto & texture : textureKeys){
+		plMipmap* tex = plMipmap::Convert(texture->getObj());
+		
+		const std::string fileName = "texture__" + texture->getName().to_std_string() ;
+		std::cout << fileName << std::endl;
+		std::cout << tex->getWidth() << "," << tex->getHeight() << " ";
+		std::cout << tex->getLevelWidth(0) << "," << tex->getLevelHeight(0) << " ";
+		std::cout << tex->getLevelSize(0) << "/" << tex->GetUncompressedSize(0) << "/" << tex->getTotalSize() << " ";
+		std::cout << plBitmap::kCompressionTypeNames[tex->getCompressionType()] << " ";
+		std::cout << plBitmap::kCompressedTypeNames[tex->getDXCompression()] << " ";
+		std::cout << plBitmap::kSpaceNames[tex->getSpace()] << " ";
+		std::cout << int(tex->getBPP()) << std::endl;
+		
+		uint8_t *dest;
+		if(tex->getCompressionType() != plBitmap::kDirectXCompression){
+			dest = (uint8_t*)(tex->getLevelData(0));
+		} else {
+			size_t blocks = tex->GetUncompressedSize(0) / sizeof(size_t);
+			if ((tex->GetUncompressedSize(0)) % sizeof(size_t) != 0)
+				++blocks;
+			
+			dest = reinterpret_cast<uint8_t*>(new size_t[blocks]);
+			//DecompressImage(0, fImageData, fLevelData[0].fSize);
+			tex->DecompressImage(0, dest, tex->getLevelSize(0));
+		}
+		
+		std::ofstream outfile(outputPath + "/" + fileName + ".ppm");
+		outfile << "P3" << std::endl;
+		outfile << tex->getLevelWidth(0) << " " << tex->getLevelHeight(0) << std::endl;
+		outfile << "255" << std::endl;
+		for(int y = 0; y < tex->getLevelHeight(0); ++y){
+			for(int x = 0; x < tex->getLevelWidth(0); ++x){
+				int pixelId = y * tex->getLevelWidth(0) + x;
+				if(pixelId%3==0){
+					outfile << std::endl;
+				}
+				outfile << int(dest[4*pixelId+0]) << " ";
+				outfile << int(dest[4*pixelId+1]) << " ";
+				outfile << int(dest[4*pixelId+2]) << " ";
+			}
+			
+		}
+		outfile << std::endl;
+		outfile.close();
+		// why is the size w*h/2. Pack 2 pixels in one unit?
+	//
+	}
 }
 
 
