@@ -15,6 +15,8 @@
 #include <PRP/Surface/plMipmap.h>
 #include <Stream/plEncryptedStream.h>
 #include <Debug/plDebug.h>
+#include <Util/plPNG.h>
+#include <Util/plJPEG.h>
 #include <string_theory/stdio>
 #include <cstring>
 #include <time.h>
@@ -25,6 +27,53 @@ std::ostream &operator<<(std::ostream& strm, const ST::string& ststr){
 	strm << ststr.to_std_string();
 	return strm;
 }
+
+static void pl_png_write(png_structp png, png_bytep data, png_size_t size) {
+	hsStream* S = reinterpret_cast<hsStream*>(png_get_io_ptr(png));
+	S->write(size, reinterpret_cast<const uint8_t*>(data));
+}
+
+void SavePNG(hsStream* S, const void* buf, size_t size,
+						uint32_t width, uint32_t height, int pixelSize) {
+	png_structp fPngWriter;
+	png_infop   fPngInfo;
+	
+	
+	
+	fPngWriter = png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
+	if (!fPngWriter)
+		throw hsPNGException(__FILE__, __LINE__, "Error initializing PNG writer");
+	
+	fPngInfo = png_create_info_struct(fPngWriter);
+	if (!fPngInfo) {
+		png_destroy_write_struct(&fPngWriter, NULL);
+		fPngWriter = NULL;
+		throw hsPNGException(__FILE__, __LINE__, "Error initializing PNG info structure");
+	}
+	png_set_write_fn(fPngWriter, (png_voidp)S, &pl_png_write, NULL);
+	png_set_IHDR(fPngWriter, fPngInfo, width, height, 8,
+				 PNG_COLOR_TYPE_RGB_ALPHA, PNG_INTERLACE_NONE,
+				 PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT);
+	
+	// Plasma uses BGR for DirectX (TODO: Does HSPlasma need this?)
+	//png_set_bgr(pi.fPngWriter);
+	
+	png_write_info(fPngWriter, fPngInfo);
+	
+	png_bytep src = reinterpret_cast<png_bytep>(const_cast<void*>(buf));
+	std::unique_ptr<png_bytep[]> rows(new png_bytep[height]);
+	const unsigned int stride = width * pixelSize / 8;
+	for (size_t i = 0; i < height; ++i) {
+		rows[i] = src + (i * stride);
+		if (rows[i] + stride > src + size)
+			throw hsPNGException(__FILE__, __LINE__, "PNG input buffer is too small");
+	}
+	
+	png_write_image(fPngWriter, rows.get());
+	png_write_end(fPngWriter, fPngInfo);
+	png_destroy_write_struct(&fPngWriter, &fPngInfo);
+}
+
 
 const std::string outputPath = "../../../data/out/";
 
@@ -54,28 +103,22 @@ void logLocation(plResManager & rm, const plLocation & ploc){
 //	}
 	plSceneNode* scene = rm.getSceneNode(ploc);
 	if(scene){
-		std::cout << scene->getKey().toString() << " (" << scene->getSceneObjects().size() << ")" << std::endl;
+		std::cout << scene->getKey()->getName() << " (" << scene->getSceneObjects().size() << ")" << std::endl;
 		for(const auto & objKey : scene->getSceneObjects()){
-			std::cout << objKey.toString() << std::endl;
-			/* if (!obj->getDrawInterface().isLoaded()) {
-			 plDebug::Warning("Cannot get draw interface for {}", obj->getKey()->getName());
-			 return;
-			 }
-			 */
-			
-			
 			
 			plSceneObject* obj = plSceneObject::Convert(rm.getObject(objKey));
 			if(!obj->getDrawInterface().Exists()){
 				continue;
 			}
+			
+			
 			plDrawInterface* draw = plDrawInterface::Convert(obj->getDrawInterface()->getObj());
 			plCoordinateInterface* coord = NULL;
 			if (obj->getCoordInterface().Exists()){
 				coord = plCoordinateInterface::Convert(obj->getCoordInterface()->getObj());
 			}
-			
-			std::cout << "Element " << draw->getNumDrawables() << std::endl;
+			std::cout << "Object: " << objKey->getName() << ": ";
+			std::cout << draw->getNumDrawables() << " drawables." << std::endl;
 			for (size_t i = 0; i < draw->getNumDrawables(); ++i) {
 				if (draw->getDrawableKey(i) == -1){
 					continue;
@@ -88,7 +131,8 @@ void logLocation(plResManager & rm, const plLocation & ploc){
 				if ((di.fFlags & plDISpanIndex::kMatrixOnly) != 0){
 					continue;
 				}
-				std::cout << "Subelements " << di.fIndices.size() << std::endl;
+				std::cout << "\tIn drawable span " << i << " (" << span->getKey()->getName() << "): " << di.fIndices.size() << " indices." << std::endl;
+				
 				for(size_t id = 0; id < di.fIndices.size(); ++id){
 					const std::string fileName = scene->getKey()->getName().to_std_string() + "__" + obj->getKey()->getName().to_std_string() + "__" + std::to_string(i) + "_" + std::to_string(id) ;
 					std::ofstream outfile(outputPath + "/" + fileName + ".obj");
@@ -99,10 +143,16 @@ void logLocation(plResManager & rm, const plLocation & ploc){
 					
 					
 					// Get the mesh internal representation.
-					plIcicle* ice = (plIcicle*)span->getSpan(di.fIndices[id]);
+					plIcicle* ice = span->getIcicle(di.fIndices[id]);
+					std::cout << "\t\t" << "Icicle " << id << " (" << di.fIndices[id] << ")";
+					//std::cout << span->getSpan(di.fIndices[id])
+					std::cout << std::endl;
+					
+					
+					
 					std::vector<plGBufferVertex> verts = span->getVerts(ice);
 					std::vector<unsigned short> indices = span->getIndices(ice);
-					std::cout << "Num uvs: " << span->getBuffer(ice->getGroupIdx())->getNumUVs() << std::endl;
+					//std::cout << "Num uvs: " << span->getBuffer(ice->getGroupIdx())->getNumUVs() << std::endl;
 					for (size_t j = 0; j < verts.size(); j++) {
 						hsVector3 pos;
 						if (coord != NULL){
@@ -123,22 +173,42 @@ void logLocation(plResManager & rm, const plLocation & ploc){
 					plKey matKey = span->getMaterials()[ice->getMaterialIdx()];
 					if (matKey.Exists()) {
 						hsGMaterial* mat = hsGMaterial::Convert(matKey->getObj(), false);
-						if (mat != NULL && mat->getLayers().size() > 0) {
-							plLayerInterface* lay = plLayerInterface::Convert(mat->getLayers()[0]->getObj(), false);
-							// find lowest underlay UV set.
-							while (lay != NULL && lay->getUnderLay().Exists()){
-								lay = plLayerInterface::Convert(lay->getUnderLay()->getObj(), false);
-							}
-							uvwSrc = lay->getUVWSrc();
-							uvwXform = lay->getTransform();
-							hasTexture = true;
+						if (mat == NULL || mat->getLayers().empty()) {
+							continue;
 						}
+						
+						std::cout << "\t\t\tMaterial: " << mat->getKey()->getName();
+						std::cout << ", " << mat->getLayers().size() << " layers. ";
+						std::cout << "Compo: " << mat->getCompFlags() << ", piggyback: " << mat->getPiggyBacks().size() << std::endl;
+						
+						for(size_t lid = 0; lid < mat->getLayers().size(); ++lid){
+							plLayerInterface* lay = plLayerInterface::Convert(mat->getLayers()[lid]->getObj(), false);
+							std::cout << "\t\t\t\t" << lay->getKey()->getName();
+							std::cout << ", flags: " << lay->getState().fBlendFlags << " " << lay->getState().fClampFlags << " " <<  lay->getState().fShadeFlags << " " <<  lay->getState().fZFlags  << " " <<  lay->getState().fMiscFlags << ".";
+							if(lay->getTexture()){
+								std::cout << " Texture: " << lay->getTexture()->getName() << ", UV: " << lay->getUVWSrc();
+								uvwSrc = lay->getUVWSrc();
+								uvwXform = lay->getTransform();
+								hasTexture = true;
+							}
+							std::cout << std::endl;
+							
+						}
+						// find lowest underlay UV set.
+						// TODO: support undlerlay?
+						//						while (lay != NULL && lay->getUnderLay().Exists()){
+						//							lay = plLayerInterface::Convert(lay->getUnderLay()->getObj(), false);
+						//							std::cout << "AZE\t\t\t\t" << lay->getKey()->getName() << std::endl;
+						//						}
+						
+						
 					}
 					if(hasTexture){
 						for (size_t j = 0; j < verts.size(); j++) {
 							hsVector3 txUvw = uvwXform.multPoint(verts[j].fUVWs[uvwSrc]);
 							// z will probably always be 0
-							outfile << "vt " << txUvw.X << " " << txUvw.Y << " " << txUvw.Z << std::endl;
+							// -1 for blender?
+							outfile << "vt " << txUvw.X << " " << -txUvw.Y << " " << txUvw.Z << std::endl;
 						}
 					}
 					
@@ -157,54 +227,43 @@ void logLocation(plResManager & rm, const plLocation & ploc){
 			}
 		}
 	}
+	bool doTexture = false;
+	if(!doTexture){
+		return;
+	}
 	const auto textureKeys = rm.getKeys(ploc, pdUnifiedTypeMap::ClassIndex("plMipmap")); // also support envmap
 	std::cout << textureKeys.size() << " textures." << std::endl;
+	
 	for(const auto & texture : textureKeys){
 		plMipmap* tex = plMipmap::Convert(texture->getObj());
 		
 		const std::string fileName = "texture__" + texture->getName().to_std_string() ;
 		std::cout << fileName << std::endl;
-		std::cout << tex->getWidth() << "," << tex->getHeight() << " ";
-		std::cout << tex->getLevelWidth(0) << "," << tex->getLevelHeight(0) << " ";
-		std::cout << tex->getLevelSize(0) << "/" << tex->GetUncompressedSize(0) << "/" << tex->getTotalSize() << " ";
-		std::cout << plBitmap::kCompressionTypeNames[tex->getCompressionType()] << " ";
-		std::cout << plBitmap::kCompressedTypeNames[tex->getDXCompression()] << " ";
-		std::cout << plBitmap::kSpaceNames[tex->getSpace()] << " ";
-		std::cout << int(tex->getBPP()) << std::endl;
+		
 		
 		uint8_t *dest;
+		size_t sizeComplete;
 		if(tex->getCompressionType() != plBitmap::kDirectXCompression){
 			dest = (uint8_t*)(tex->getLevelData(0));
+			sizeComplete = tex->getLevelSize(0);
+			
 		} else {
 			size_t blocks = tex->GetUncompressedSize(0) / sizeof(size_t);
 			if ((tex->GetUncompressedSize(0)) % sizeof(size_t) != 0)
 				++blocks;
-			
+			sizeComplete = tex->GetUncompressedSize(0);
 			dest = reinterpret_cast<uint8_t*>(new size_t[blocks]);
 			//DecompressImage(0, fImageData, fLevelData[0].fSize);
 			tex->DecompressImage(0, dest, tex->getLevelSize(0));
-		}
-		
-		std::ofstream outfile(outputPath + "/" + fileName + ".ppm");
-		outfile << "P3" << std::endl;
-		outfile << tex->getLevelWidth(0) << " " << tex->getLevelHeight(0) << std::endl;
-		outfile << "255" << std::endl;
-		for(int y = 0; y < tex->getLevelHeight(0); ++y){
-			for(int x = 0; x < tex->getLevelWidth(0); ++x){
-				int pixelId = y * tex->getLevelWidth(0) + x;
-				if(pixelId%3==0){
-					outfile << std::endl;
-				}
-				outfile << int(dest[4*pixelId+0]) << " ";
-				outfile << int(dest[4*pixelId+1]) << " ";
-				outfile << int(dest[4*pixelId+2]) << " ";
-			}
+			
 			
 		}
-		outfile << std::endl;
-		outfile.close();
-		// why is the size w*h/2. Pack 2 pixels in one unit?
-	//
+		hsFileStream outTex;
+		outTex.open(ST::string(outputPath + "/" + fileName + ".png"), FileMode::fmWrite);
+		SavePNG(&outTex, dest, sizeComplete, tex->getLevelWidth(0),  tex->getLevelHeight(0), tex->getBPP());
+		outTex.close();
+		
+
 	}
 }
 
