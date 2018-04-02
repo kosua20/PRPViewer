@@ -27,6 +27,10 @@ ExternalProject_Add(libhsplasmaext
 include_directories(${PROJECT_BINARY_DIR}/include/HSPlasma)
 set(HSPLASMA_LIB ${PROJECT_BINARY_DIR}/lib/libHSPlasma.a)
 
+set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
+set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+add_subdirectory(external/glfw)
 
 # Dependencies
 find_package(ZLIB REQUIRED)
@@ -35,13 +39,31 @@ find_package(PNG REQUIRED)
 find_package(Threads REQUIRED)
 find_package(string_theory 1.5 REQUIRED)
 add_definitions(-DST_NO_2_0_DEPRECATION)
-
+#find_package(OpenGL REQUIRED)
+find_package(Boost COMPONENTS system filesystem REQUIRED)
 
 # Project
-file(GLOB project_sources src/*.cpp)
-add_executable(PrpViewer ${project_sources})
+file(GLOB_RECURSE SOURCES src/*.c* RECURSE)
+file(GLOB_RECURSE HEADERS src/*.h* RECURSE)
+
+file(GLOB HELPERS_FILES src/helpers/*)
+source_group(helpers FILES ${HELPERS_FILES})
+file(GLOB INPUT_FILES src/input/*)
+source_group(input FILES ${INPUT_FILES})
+file(GLOB RESOURCES_FILES src/resources/*)
+source_group(resources FILES ${RESOURCES_FILES})
+file(GLOB_RECURSE LIBS_FILES src/libs/* )
+source_group(libs FILES ${LIBS_FILES})
+file(GLOB BASE_FILES src/*)
+source_group("" FILES ${BASE_FILES})
+include_directories(src/libs)
+set(SOURCE_FILES ${SOURCES} ${HEADERS} )
+add_executable(PrpViewer ${SOURCE_FILES})
 
 add_dependencies(PrpViewer libhsplasmaext)
 target_link_libraries(PrpViewer ${PNG_LIBRARIES} ${JPEG_LIBRARIES} ${ZLIB_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${STRING_THEORY_LIBRARIES} ${HSPLASMA_LIB} )
-
+target_link_libraries(PrpViewer glfw ${Boost_FILESYSTEM_LIBRARY} ${Boost_SYSTEM_LIBRARY})
+#target_include_directories(PrpViewer ${OPENGL_INCLUDE_DIR})
+#target_link_libraries(PrpViewer ${OPENGL_gl_LIBRARY})
+#target_link_libraries(myapp ${OPENGL_glu_LIBRARY})
 install(TARGETS PrpViewer RUNTIME DESTINATION bin)
