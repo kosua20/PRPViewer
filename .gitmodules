@@ -1,3 +1,6 @@
 [submodule "external/libhsplasma"]
 	path = external/libhsplasma
 	url = https://github.com/kosua20/libhsplasma
+[submodule "external/glfw"]
+	path = external/glfw
+	url = https://github.com/glfw/glfw/
