@@ -15,14 +15,14 @@ Renderer::Renderer(Config & config) : _config(config) {
 	_renderResolution = (_config.internalVerticalResolution/_config.screenResolution[1]) * _config.screenResolution;
 	
 	defaultGLSetup();
-	
+	_age.reset(new Age("../../../data/spyroom.age"));
 	// Setup camera parameters.
 	//_camera.projection(config.screenResolution[0]/config.screenResolution[1], 1.3f, 0.01f, 200.0f);
 }
 
 void Renderer::draw(){
 	glViewport(0, 0, GLsizei(_config.screenResolution[0]), GLsizei(_config.screenResolution[1]));
-	glClearColor(1.0f,0.5f, 0.1f, 1.0f);
+	glClearColor(0.45f,0.45f, 0.5f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	
 	if (ImGui::Begin("Options")) {
@@ -32,7 +32,10 @@ void Renderer::draw(){
 		std::string selectedFile;
 		if(ImGui::BeginFilePicker("Load Age", "Load a .age file.", "../../../data/", selectedFile, false)){
 			Log::Info() << "Should load " << selectedFile << std::endl;
+			_age.reset(new Age(selectedFile));
 		}
+		const std::string nameStr = "Current: " + (_age ? _age->getName() : "None");
+		ImGui::Text("%s", nameStr.c_str());
 	}
 	ImGui::End();
 }

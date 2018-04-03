@@ -37,6 +37,8 @@ protected:
 	
 	Config & _config;
 	glm::vec2 _renderResolution;
+	std::shared_ptr<Age> _age;
+	
 	
 private:
 	

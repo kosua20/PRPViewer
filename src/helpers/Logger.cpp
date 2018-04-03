@@ -2,6 +2,7 @@
 #include <ctime>
 #include <iomanip>
 #include <iostream>
+
 // We statically initialize the default logger.
 // We don't really care about its exact construction/destruction moments,
 // but we want it to always be created.
@@ -173,5 +174,11 @@ Log & Log::operator<<(const glm::vec3& input){
 Log & Log::operator<<(const glm::vec2& input){
 	appendIfNeeded();
 	_stream << "vec2( " << input[0] << ", " << input[1] << " )";
+	return *this;
+}
+
+Log &Log::operator<<(const ST::string& ststr){
+	appendIfNeeded();
+	_stream << ststr.to_std_string();
 	return *this;
 }

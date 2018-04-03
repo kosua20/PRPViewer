@@ -1,5 +1,5 @@
-#include <stdio.h>
-#include <iostream>
+#include "Age.hpp"
+#include "helpers/Logger.hpp"
 #include <string>
 #include <ResManager/plResManager.h>
 #include <Debug/hsExceptions.hpp>
@@ -22,12 +22,8 @@
 #include <time.h>
 #include <unistd.h>
 #include <fstream>
-#include <boost/filesystem.hpp>
-std::ostream &operator<<(std::ostream& strm, const ST::string& ststr){
-	strm << ststr.to_std_string();
-	return strm;
-}
 
+/*
 static void pl_png_write(png_structp png, png_bytep data, png_size_t size) {
 	hsStream* S = reinterpret_cast<hsStream*>(png_get_io_ptr(png));
 	S->write(size, reinterpret_cast<const uint8_t*>(data));
@@ -74,37 +70,57 @@ void SavePNG(hsStream* S, const void* buf, size_t size,
 	png_destroy_write_struct(&fPngWriter, &fPngInfo);
 }
 
+*/
 
-const std::string outputPath = "../../../data/out/";
 
-void logLocation(plResManager & rm, const plLocation & ploc){
-	/*const auto types = rm.getTypes(ploc);
+Age::Age(const std::string & path){
 	
-	std::cout << "(" << types.size() << ")" << std::endl;
-	for(const auto & type : types){
-		std::cout << "\t" << pdUnifiedTypeMap::ClassName(type);
-		
-		
-		const auto keys = rm.getKeys(ploc, type);
-		
-		std::cout << " (" << keys.size() << ")" << std::endl;
-		for(const auto & key : keys){
-			std::cout << "\t\t" << key.toString() << std::endl;
-		}
-	}*/
-//	const auto keys = rm.getKeys(ploc, pdUnifiedTypeMap::ClassIndex("plSceneNode"));
-//
-//	std::cout << " (" << keys.size() << ")" << std::endl;
-//	for(const auto & key : keys){
-//
-//		// (plSceneNode*)rm.getObject(key);
-//
-//		//std::cout << "\t\t" << (scene->getSceneObjects()).toString() << std::endl;
-//	}
+	const PlasmaVer plasmaVersion = PlasmaVer::pvMoul;
+	
+	plResManager rm;
+	plAgeInfo* age = rm.ReadAge(path, true);
+	
+	_name = age->getAgeName().to_std_string();
+	
+	Log::Info() << "Age " << _name << ":" << std::endl;
+	
+	const size_t pageCount = age->getNumPages();
+	Log::Info() << pageCount << " pages." << std::endl;
+	for(int i = 0 ; i < pageCount; ++i){
+		Log::Info() << "\t" << age->getPageFilename(i, plasmaVersion) << std::endl;
+	}
+	
+	const size_t commmonCount = age->getNumCommonPages(plasmaVersion);
+	Log::Info() << commmonCount << " common pages." << std::endl;
+	for(int i = 0 ; i < commmonCount; ++i){
+		Log::Info() << "\t" << age->getCommonPageFilename(i, plasmaVersion) << std::endl;
+	}
+	Log::Info() << std::endl;
+	
+	for(int i = 0 ; i < age->getNumPages(); ++i){
+		Log::Info() << "Page: " << age->getPageFilename(i, plasmaVersion) << " ";
+		const plLocation ploc = age->getPageLoc(i, plasmaVersion);
+		loadMeshes(rm, ploc);
+	}
+	
+	for(int i = 0 ; i < age->getNumCommonPages(plasmaVersion); ++i){
+		Log::Info() << "Page: " << age->getCommonPageFilename(i, plasmaVersion) << " ";
+		const plLocation ploc = age->getCommonPageLoc(i, plasmaVersion);
+		loadMeshes(rm, ploc);
+	}
+	Log::Info() << std::endl;
+	
+}
+
+
+void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 	plSceneNode* scene = rm.getSceneNode(ploc);
 	if(scene){
-		std::cout << scene->getKey()->getName() << " (" << scene->getSceneObjects().size() << ")" << std::endl;
+	
+		//Log::Info() << scene->getKey()->getName() << " (" << scene->getSceneObjects().size() << ")" << std::endl;
+		
 		for(const auto & objKey : scene->getSceneObjects()){
+			
 			
 			plSceneObject* obj = plSceneObject::Convert(rm.getObject(objKey));
 			if(!obj->getDrawInterface().Exists()){
@@ -117,13 +133,13 @@ void logLocation(plResManager & rm, const plLocation & ploc){
 			if (obj->getCoordInterface().Exists()){
 				coord = plCoordinateInterface::Convert(obj->getCoordInterface()->getObj());
 			}
-			std::cout << "Object: " << objKey->getName() << ": ";
-			std::cout << draw->getNumDrawables() << " drawables." << std::endl;
+			Log::Info() << "Object: " << objKey->getName() << ": ";
+			Log::Info() << draw->getNumDrawables() << " drawables." << std::endl;
 			for (size_t i = 0; i < draw->getNumDrawables(); ++i) {
 				if (draw->getDrawableKey(i) == -1){
 					continue;
 				}
-				
+			
 				// A span group multiple objects data/assets.
 				plDrawableSpans* span = plDrawableSpans::Convert(draw->getDrawable(i)->getObj());
 				plDISpanIndex di = span->getDIIndex(draw->getDrawableKey(i));
@@ -131,28 +147,28 @@ void logLocation(plResManager & rm, const plLocation & ploc){
 				if ((di.fFlags & plDISpanIndex::kMatrixOnly) != 0){
 					continue;
 				}
-				std::cout << "\tIn drawable span " << i << " (" << span->getKey()->getName() << "): " << di.fIndices.size() << " indices." << std::endl;
-				
+				Log::Info() << "\tIn drawable span " << i << " (" << span->getKey()->getName() << "): " << di.fIndices.size() << " indices." << std::endl;
+					
 				for(size_t id = 0; id < di.fIndices.size(); ++id){
 					const std::string fileName = scene->getKey()->getName().to_std_string() + "__" + obj->getKey()->getName().to_std_string() + "__" + std::to_string(i) + "_" + std::to_string(id) ;
-					std::ofstream outfile(outputPath + "/" + fileName + ".obj");
-					if(!outfile.is_open()){
-						std::cerr << "ISSUE" << std::endl;
-						continue;
-					}
+//					std::ofstream outfile(outputPath + "/" + fileName + ".obj");
+//					if(!outfile.is_open()){
+//						std::cerr << "ISSUE" << std::endl;
+//						continue;
+//					}
 					
 					
 					// Get the mesh internal representation.
 					plIcicle* ice = span->getIcicle(di.fIndices[id]);
-					std::cout << "\t\t" << "Icicle " << id << " (" << di.fIndices[id] << ")";
-					//std::cout << span->getSpan(di.fIndices[id])
-					std::cout << std::endl;
+					Log::Info() << "\t\t" << "Icicle " << id << " (" << di.fIndices[id] << ")";
+					//Log::Info() << span->getSpan(di.fIndices[id])
+					Log::Info() << std::endl;
 					
 					
 					
 					std::vector<plGBufferVertex> verts = span->getVerts(ice);
 					std::vector<unsigned short> indices = span->getIndices(ice);
-					//std::cout << "Num uvs: " << span->getBuffer(ice->getGroupIdx())->getNumUVs() << std::endl;
+					//Log::Info() << "Num uvs: " << span->getBuffer(ice->getGroupIdx())->getNumUVs() << std::endl;
 					for (size_t j = 0; j < verts.size(); j++) {
 						hsVector3 pos;
 						if (coord != NULL){
@@ -160,9 +176,9 @@ void logLocation(plResManager & rm, const plLocation & ploc){
 						} else {
 							pos = ice->getLocalToWorld().multPoint(verts[j].fPos);// * 10.0f;
 						}
-						outfile << "v " << pos.X << " " << pos.Z << " " << (-pos.Y) << std::endl;
+					//	outfile << "v " << pos.X << " " << pos.Z << " " << (-pos.Y) << std::endl;
 						
-						outfile << "vn " <<  verts[j].fNormal.X << " " <<  verts[j].fNormal.Z << " " << (- verts[j].fNormal.Y) << std::endl;
+					//	outfile << "vn " <<  verts[j].fNormal.X << " " <<  verts[j].fNormal.Z << " " << (- verts[j].fNormal.Y) << std::endl;
 						
 					}
 					
@@ -176,16 +192,16 @@ void logLocation(plResManager & rm, const plLocation & ploc){
 							continue;
 						}
 						
-						std::cout << "\t\t\tMaterial: " << mat->getKey()->getName();
-						std::cout << ", " << mat->getLayers().size() << " layers. ";
-						std::cout << "Compo: " << mat->getCompFlags() << ", piggyback: " << mat->getPiggyBacks().size() << std::endl;
+						Log::Info() << "\t\t\tMaterial: " << mat->getKey()->getName();
+						Log::Info() << ", " << mat->getLayers().size() << " layers. ";
+						Log::Info() << "Compo: " << mat->getCompFlags() << ", piggyback: " << mat->getPiggyBacks().size() << std::endl;
 						
 						for(size_t lid = 0; lid < mat->getLayers().size(); ++lid){
 							plLayerInterface* lay = plLayerInterface::Convert(mat->getLayers()[lid]->getObj(), false);
-							std::cout << "\t\t\t\t" << lay->getKey()->getName();
-							std::cout << ", flags: " << lay->getState().fBlendFlags << " " << lay->getState().fClampFlags << " " <<  lay->getState().fShadeFlags << " " <<  lay->getState().fZFlags  << " " <<  lay->getState().fMiscFlags << ".";
+							Log::Info() << "\t\t\t\t" << lay->getKey()->getName();
+							Log::Info() << ", flags: " << lay->getState().fBlendFlags << " " << lay->getState().fClampFlags << " " <<  lay->getState().fShadeFlags << " " <<  lay->getState().fZFlags  << " " <<  lay->getState().fMiscFlags << ".";
 							if(lay->getTexture()){
-								std::cout << " Texture: " << lay->getTexture()->getName() << ", UV: " << lay->getUVWSrc();
+								Log::Info() << " Texture: " << lay->getTexture()->getName() << ", UV: " << lay->getUVWSrc();
 								// Export uvs.
 								const unsigned int uvwSrc = lay->getUVWSrc();
 								const hsMatrix44 uvwXform = lay->getTransform();
@@ -193,58 +209,55 @@ void logLocation(plResManager & rm, const plLocation & ploc){
 									hsVector3 txUvw = uvwXform.multPoint(verts[j].fUVWs[uvwSrc]);
 									// z will probably always be 0
 									// -1 for blender?
-									outfile << "vt " << txUvw.X << " " << -txUvw.Y << " " << txUvw.Z << std::endl;
+									//outfile << "vt " << txUvw.X << " " << -txUvw.Y << " " << txUvw.Z << std::endl;
 								}
 								hasTexture = true;
 							}
-							std::cout << std::endl;
+							Log::Info() << std::endl;
 							
 						}
-						// find lowest underlay UV set.
-						// TODO: support undlerlay?
-						//						while (lay != NULL && lay->getUnderLay().Exists()){
-						//							lay = plLayerInterface::Convert(lay->getUnderLay()->getObj(), false);
-						//							std::cout << "AZE\t\t\t\t" << lay->getKey()->getName() << std::endl;
+							// find lowest underlay UV set.
+							// TODO: support undlerlay?
+							//						while (lay != NULL && lay->getUnderLay().Exists()){
+							//							lay = plLayerInterface::Convert(lay->getUnderLay()->getObj(), false);
+							//							Log::Info() << "AZE\t\t\t\t" << lay->getKey()->getName() << std::endl;
+							//						}
+							
+							
+					}
+						//					if(hasTexture){
+						//						for (size_t j = 0; j < verts.size(); j++) {
+						//							hsVector3 txUvw = uvwXform.multPoint(verts[j].fUVWs[uvwSrc]);
+						//							// z will probably always be 0
+						//							// -1 for blender?
+						//							outfile << "vt " << txUvw.X << " " << -txUvw.Y << " " << txUvw.Z << std::endl;
 						//						}
+						//					}
 						
 						
-					}
-//					if(hasTexture){
-//						for (size_t j = 0; j < verts.size(); j++) {
-//							hsVector3 txUvw = uvwXform.multPoint(verts[j].fUVWs[uvwSrc]);
-//							// z will probably always be 0
-//							// -1 for blender?
-//							outfile << "vt " << txUvw.X << " " << -txUvw.Y << " " << txUvw.Z << std::endl;
-//						}
-//					}
-					
-					
 					for (size_t j = 0; j < indices.size(); j += 3) {
-						outfile << "f " << indices[j]+1 << "/" << (hasTexture ? std::to_string(indices[j]+1) : "") << "/" << indices[j]+1;
-						outfile <<  " " << indices[j+1]+1 << "/" << (hasTexture ? std::to_string(indices[j+1]+1) : "") << "/" << indices[j+1]+1;
-						outfile <<  " " << indices[j+2]+1 << "/" << (hasTexture ? std::to_string(indices[j+2]+1) : "") << "/" << indices[j+2]+1;
-						outfile << std::endl;
+							//outfile << "f " << indices[j]+1 << "/" << (hasTexture ? std::to_string(indices[j]+1) : "") << "/" << indices[j]+1;
+							//outfile <<  " " << indices[j+1]+1 << "/" << (hasTexture ? std::to_string(indices[j+1]+1) : "") << "/" << indices[j+1]+1;
+							//outfile <<  " " << indices[j+2]+1 << "/" << (hasTexture ? std::to_string(indices[j+2]+1) : "") << "/" << indices[j+2]+1;
+							//outfile << std::endl;
 					}
-					outfile.close();
-					
-					
+						//outfile.close();
+						
+						
 				}
-				
+					
 			}
 		}
 	}
-	bool doTexture = false;
-	if(!doTexture){
-		return;
-	}
+
 	const auto textureKeys = rm.getKeys(ploc, pdUnifiedTypeMap::ClassIndex("plMipmap")); // also support envmap
-	std::cout << textureKeys.size() << " textures." << std::endl;
-	
+	Log::Info() << textureKeys.size() << " textures." << std::endl;
+
 	for(const auto & texture : textureKeys){
 		plMipmap* tex = plMipmap::Convert(texture->getObj());
 		
 		const std::string fileName = "texture__" + texture->getName().to_std_string() ;
-		std::cout << fileName << std::endl;
+		Log::Info() << fileName << std::endl;
 		
 		
 		uint8_t *dest;
@@ -264,77 +277,13 @@ void logLocation(plResManager & rm, const plLocation & ploc){
 			
 			
 		}
-		hsFileStream outTex;
-		outTex.open(ST::string(outputPath + "/" + fileName + ".png"), FileMode::fmWrite);
-		SavePNG(&outTex, dest, sizeComplete, tex->getLevelWidth(0),  tex->getLevelHeight(0), tex->getBPP());
-		outTex.close();
+		//hsFileStream outTex;
+		//outTex.open(ST::string(outputPath + "/" + fileName + ".png"), FileMode::fmWrite);
+		//SavePNG(&outTex, dest, sizeComplete, tex->getLevelWidth(0),  tex->getLevelHeight(0), tex->getBPP());
+		//outTex.close();
 		
-
+		
 	}
 }
 
 
-int main1(int argc, char** argv){
-	std::cout << "Shorah !" << std::endl;
-	if(argc < 2){
-		return 1;
-	}
-	
-	const std::string path(argv[1]);
-	const PlasmaVer plasmaVersion = PlasmaVer::pvMoul;
-	
-	plResManager rm;
-	plAgeInfo* age;
-	try {
-		age = rm.ReadAge(path, true);
-		
-	} catch (hsException& e) {
-		ST::printf(stderr, "{}:{}: {}\n", e.File(), e.Line(), e.what());
-		return 1;
-	} catch (std::exception& e) {
-		ST::printf(stderr, "Prc Extract Exception: {}\n", e.what());
-		return 1;
-	} catch (...) {
-		fputs("Undefined error!\n", stderr);
-		return 1;
-	}
-	
-	
-	
-	ST::string outDir = age->getAgeName();
-	
-	std::cout << outDir.to_std_string() << ":" << std::endl;
-	
-	const size_t pageCount = age->getNumPages();
-	std::cout << pageCount << " pages." << std::endl;
-	for(int i = 0 ; i < pageCount; ++i){
-		std::cout << "\t" << age->getPageFilename(i, plasmaVersion) << std::endl;
-	}
-	
-	const size_t commmonCount = age->getNumCommonPages(plasmaVersion);
-	std::cout << commmonCount << " common pages." << std::endl;
-	for(int i = 0 ; i < commmonCount; ++i){
-		std::cout << "\t" << age->getCommonPageFilename(i, plasmaVersion) << std::endl;
-	}
-	std::cout << std::endl;
-	
-	for(int i = 0 ; i < age->getNumPages(); ++i){
-		std::cout << "Page: " << age->getPageFilename(i, plasmaVersion) << " ";
-		const plLocation ploc = age->getPageLoc(i, plasmaVersion);
-		logLocation(rm, ploc);
-	}
-	
-	for(int i = 0 ; i < age->getNumCommonPages(plasmaVersion); ++i){
-		std::cout << "Page: " << age->getCommonPageFilename(i, plasmaVersion) << " ";
-		const plLocation ploc = age->getCommonPageLoc(i, plasmaVersion);
-		logLocation(rm, ploc);
-	}
-	
-	
-	
-	
-	
-	
-	
-	return 0;
-}

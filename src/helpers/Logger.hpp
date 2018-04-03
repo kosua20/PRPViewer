@@ -6,6 +6,8 @@
 #include <sstream>
 #include <vector>
 #include <glm/glm.hpp>
+#include <string_theory/string>
+
 // Fix for Windows headers.
 #ifdef ERROR
 #undef ERROR
@@ -65,6 +67,8 @@ public:
 	Log & operator<<(const glm::vec3& input);
 	
 	Log & operator<<(const glm::vec2& input);
+	
+	Log & operator<<(const ST::string& ststr);
 	
 public:
 	
