@@ -76,9 +76,9 @@ void SavePNG(hsStream* S, const void* buf, size_t size,
 Age::Age(const std::string & path){
 	
 	const PlasmaVer plasmaVersion = PlasmaVer::pvMoul;
+	_rm.reset(new plResManager());
 	
-	plResManager rm;
-	plAgeInfo* age = rm.ReadAge(path, true);
+	plAgeInfo* age = _rm->ReadAge(path, true);
 	
 	_name = age->getAgeName().to_std_string();
 	
@@ -87,26 +87,20 @@ Age::Age(const std::string & path){
 	const size_t pageCount = age->getNumPages();
 	Log::Info() << pageCount << " pages." << std::endl;
 	for(int i = 0 ; i < pageCount; ++i){
-		Log::Info() << "\t" << age->getPageFilename(i, plasmaVersion) << std::endl;
+		Log::Info() << "Page: " << age->getPageFilename(i, plasmaVersion) << " ";
+		const plLocation ploc = age->getPageLoc(i, plasmaVersion);
+		//loadMeshes(*_rm, ploc);
+		Log::Info() << std::endl;
 	}
+	Log::Info() << std::endl;
 	
 	const size_t commmonCount = age->getNumCommonPages(plasmaVersion);
 	Log::Info() << commmonCount << " common pages." << std::endl;
 	for(int i = 0 ; i < commmonCount; ++i){
-		Log::Info() << "\t" << age->getCommonPageFilename(i, plasmaVersion) << std::endl;
-	}
-	Log::Info() << std::endl;
-	
-	for(int i = 0 ; i < age->getNumPages(); ++i){
-		Log::Info() << "Page: " << age->getPageFilename(i, plasmaVersion) << " ";
-		const plLocation ploc = age->getPageLoc(i, plasmaVersion);
-		loadMeshes(rm, ploc);
-	}
-	
-	for(int i = 0 ; i < age->getNumCommonPages(plasmaVersion); ++i){
 		Log::Info() << "Page: " << age->getCommonPageFilename(i, plasmaVersion) << " ";
 		const plLocation ploc = age->getCommonPageLoc(i, plasmaVersion);
-		loadMeshes(rm, ploc);
+		//loadMeshes(*_rm, ploc);
+		Log::Info() << std::endl;
 	}
 	Log::Info() << std::endl;
 	
@@ -120,7 +114,8 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 		//Log::Info() << scene->getKey()->getName() << " (" << scene->getSceneObjects().size() << ")" << std::endl;
 		
 		for(const auto & objKey : scene->getSceneObjects()){
-			
+			// For each object, store its subgeometries (icicle)
+			// and the used materials, referencing textures.
 			
 			plSceneObject* obj = plSceneObject::Convert(rm.getObject(objKey));
 			if(!obj->getDrawInterface().Exists()){
@@ -254,6 +249,7 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 	Log::Info() << textureKeys.size() << " textures." << std::endl;
 
 	for(const auto & texture : textureKeys){
+		// For each texture, send it to the gpu and keep a reference and the name.
 		plMipmap* tex = plMipmap::Convert(texture->getObj());
 		
 		const std::string fileName = "texture__" + texture->getName().to_std_string() ;

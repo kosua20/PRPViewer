@@ -19,6 +19,7 @@ private:
 	void loadMeshes( plResManager & rm, const plLocation& ploc);
 	
 	std::string _name;
+	std::shared_ptr<plResManager> _rm;
 };
 
 #endif
