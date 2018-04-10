@@ -23,6 +23,10 @@ public:
 		return _objects;
 	}
 	
+	const std::vector<std::string> & textures(){
+		return _textures;
+	}
+	
 	const glm::vec3 getDefaultLinkingPoint();
 	
 	const std::map<std::string, glm::vec3> & linkingPoints(){
@@ -39,8 +43,10 @@ private:
 	std::string _name;
 	//std::shared_ptr<plResManager> _rm;
 	std::vector<Object> _objects;
+	std::vector<std::string> _textures;
 	std::map<std::string, glm::vec3> _linkingPoints;
 	std::vector<std::string> _linkingNamesCache;
+	
 };
 
 #endif

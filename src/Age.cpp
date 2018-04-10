@@ -102,7 +102,7 @@ Age::Age(const std::string & path){
 	for(int i = 0 ; i < commmonCount; ++i){
 		Log::Info() << "Page: " << age->getCommonPageFilename(i, plasmaVersion) << " ";
 		const plLocation ploc = age->getCommonPageLoc(i, plasmaVersion);
-		//loadMeshes(*_rm, ploc);
+		loadMeshes(_rm, ploc);
 		Log::Info() << std::endl;
 	}
 	Log::Info() << std::endl;
@@ -110,14 +110,15 @@ Age::Age(const std::string & path){
 	checkGLError();
 	Log::Info() << "Objects: " << _objects.size() << std::endl;
 	_rm.DelAge(age->getAgeName());
+	
+	
 }
 
 Age::~Age(){
-	//_rm->
+
 	for(const auto & obj : _objects){
 		obj.clean();
 	}
-	//_rm.reset();
 }
 
 void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
@@ -125,17 +126,11 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 	
 	if(scene){
 		
-		//Log::Info() << scene->getKey()->getName() << " (" << scene->getSceneObjects().size() << ")" << std::endl;
-		
 		for(const auto & objKey : scene->getSceneObjects()){
-			// For each object, store its subgeometries (icicle)
-			// and the used materials, referencing textures.
 			
 			plSceneObject* obj = plSceneObject::Convert(rm.getObject(objKey));
 			
-			//Log::Info() << objKey->getName() << std::endl;
 			if(objKey->getName().substr(0, 11) == "LinkInPoint" && obj->getCoordInterface().Exists()){
-				Log::Info() << objKey->getName() << std::endl;
 				plCoordinateInterface* coord = plCoordinateInterface::Convert(obj->getCoordInterface()->getObj());
 				const auto matCenter = coord->getLocalToWorld();
 				if(objKey->getName() == "LinkInPointDefault"){
@@ -147,48 +142,39 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 				}
 			}
 			
-			
 			if(!obj->getDrawInterface().Exists()){
 				continue;
 			}
-			
-			
 			plDrawInterface* draw = plDrawInterface::Convert(obj->getDrawInterface()->getObj());
 			
+			Object::Type type = Object::Default;
 			
-			
-			
-		
-			
-			bool isBillboard = false;
 			for(const auto & modKey : obj->getModifiers()){
 				if(modKey->getType() == kViewFaceModifier){
-					Log::Info() << "BILLBOARD" << std::endl;
 					plViewFaceModifier* modif = plViewFaceModifier::Convert(modKey->getObj());
-					Log::Info() << 	modif->getLocalToParent() << std::endl;
-					isBillboard = true;
+					if(modif->getFlag(plViewFaceModifier::kPivotY)){
+						type = Object::BillboardY;
+					} else {
+						type = Object::Billboard;
+					}
 				}
 			}
 			
-			
 			glm::mat4 model = glm::mat4(1.0f);
-			
 			bool bakePosition = !obj->getCoordInterface().Exists();
 			if(!bakePosition ){
-				
-				hsMatrix44 localToWorld = hsMatrix44::Identity();
 				plCoordinateInterface* coord = plCoordinateInterface::Convert(obj->getCoordInterface()->getObj());
-				localToWorld = coord->getLocalToWorld();
-				if(isBillboard){Log::Info() << 	localToWorld << std::endl;}
+				hsMatrix44 localToWorld = coord->getLocalToWorld();
 				model[0][0] = localToWorld(0,0); model[0][1] = localToWorld(1,0); model[0][2] = localToWorld(2,0); model[0][3] = localToWorld(3,0);
 				model[1][0] = localToWorld(0,1); model[1][1] = localToWorld(1,1); model[1][2] = localToWorld(2,1); model[1][3] = localToWorld(3,1);
 				model[2][0] = localToWorld(0,2); model[2][1] = localToWorld(1,2); model[2][2] = localToWorld(2,2); model[2][3] = localToWorld(3,2);
 				model[3][0] = localToWorld(0,3); model[3][1] = localToWorld(1,3); model[3][2] = localToWorld(2,3); model[3][3] = localToWorld(3,3);
 			}
+			// Swap axis.
 			model = glm::rotate(glm::mat4(1.0f), -float(M_PI_2), glm::vec3(1.0f,0.0f,0.0f)) * model;
 			
-			_objects.emplace_back(Resources::manager().getProgram("object_basic"), model, isBillboard);
-			
+			//Log::Info() << objKey->getName() << std::endl;
+			_objects.emplace_back(type, Resources::manager().getProgram("object_basic"), model);
 			
 			for (size_t i = 0; i < draw->getNumDrawables(); ++i) {
 				if (draw->getDrawableKey(i) == -1){
@@ -203,32 +189,18 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 				if ((di.fFlags & plDISpanIndex::kMatrixOnly) != 0){
 					continue;
 				}
-				//Log::Info() << "\tIn drawable span " << i << " (" << span->getKey()->getName() << "): " << di.fIndices.size() << " indices." << std::endl;
 					
 				for(size_t id = 0; id < di.fIndices.size(); ++id){
 					const std::string fileName = scene->getKey()->getName().to_std_string() + "_" + obj->getKey()->getName().to_std_string() + "_" + std::to_string(i) + "_" + std::to_string(id) ;
-//					std::ofstream outfile(outputPath + "/" + fileName + ".obj");
-//					if(!outfile.is_open()){
-//						std::cerr << "ISSUE" << std::endl;
-//						continue;
-//					}
-					
-					
+
 					// Get the mesh internal representation.
 					plIcicle* ice = span->getIcicle(di.fIndices[id]);
 					
-					
-					//Log::Info() << "\t\t" << "Icicle " << id << " (" << di.fIndices[id] << ")";
-					//Log::Info() << span->getSpan(di.fIndices[id])
-					//Log::Info() << std::endl;
+					// if we have to bake the icicle specific position, use it.
 					const hsMatrix44 transfoMatrix = (bakePosition ? ice->getLocalToWorld() : hsMatrix44::Identity());
-					
-					//const glm::vec3 center(centerRaw.X, centerRaw.Z, -centerRaw.Y);
-					//Log::Info() << center << std::endl;
 					
 					std::vector<plGBufferVertex> verts = span->getVerts(ice);
 					std::vector<unsigned short> indices = span->getIndices(ice);
-					//Log::Info() << "Num uvs: " << span->getBuffer(ice->getGroupIdx())->getNumUVs() << std::endl;
 					
 					std::vector<unsigned int> meshIndices(indices.size());
 					std::vector<glm::vec3> meshPositions(verts.size());
@@ -240,14 +212,14 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 					}
 					
 					for (size_t j = 0; j < verts.size(); j++) {
-						const hsVector3 pos = transfoMatrix.multPoint(verts[j].fPos);// * 10.0f;
+						const hsVector3 pos = transfoMatrix.multPoint(verts[j].fPos);
 						const auto fnorm = verts[j].fNormal;
 						meshPositions[j] = glm::vec3(pos.X, pos.Y, pos.Z);
 						meshNormals[j] = glm::vec3(fnorm.X, fnorm.Y, fnorm.Z);
 					}
 					
 					bool hasTexture = false;
-					// Find proper uv transformation (we can translate/scale material layers)
+					
 					
 					plKey matKey = span->getMaterials()[ice->getMaterialIdx()];
 					if (matKey.Exists()) {
@@ -255,7 +227,7 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 						if (mat == NULL || mat->getLayers().empty()) {
 							continue;
 						}
-						
+						//Log::Info() << "Num uvs: " << span->getBuffer(ice->getGroupIdx())->getNumUVs() << std::endl;
 						//Log::Info() << "\t\t\tMaterial: " << mat->getKey()->getName();
 						//Log::Info() << ", " << mat->getLayers().size() << " layers. ";
 						//Log::Info() << "Compo: " << mat->getCompFlags() << ", piggyback: " << mat->getPiggyBacks().size() << std::endl;
@@ -265,106 +237,44 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 							//Log::Info() << "\t\t\t\t" << lay->getKey()->getName();
 							//Log::Info() << ", flags: " << lay->getState().fBlendFlags << " " << lay->getState().fClampFlags << " " <<  lay->getState().fShadeFlags << " " <<  lay->getState().fZFlags  << " " <<  lay->getState().fMiscFlags << ".";
 							if(lay->getTexture()){
-							//	Log::Info() << " Texture: " << lay->getTexture()->getName() << ", UV: " << lay->getUVWSrc();
-								// Export uvs.
-								const unsigned int uvwSrc = lay->getUVWSrc();
-								const hsMatrix44 uvwXform = lay->getTransform();
-								for (size_t j = 0; j < verts.size(); j++) {
-									//hsVector3 txUvw = uvwXform.multPoint(verts[j].fUVWs[uvwSrc]);
-									// z will probably always be 0
-									// -1 for blender?
-									//outfile << "vt " << txUvw.X << " " << -txUvw.Y << " " << txUvw.Z << std::endl;
-								}
+								//	Log::Info() << " Texture: " << lay->getTexture()->getName() << ", UV: " << lay->getUVWSrc();
 								hasTexture = true;
 							}
 							//Log::Info() << std::endl;
-							
 						}
 						
 						plLayerInterface* lay = plLayerInterface::Convert(mat->getLayers()[0]->getObj(), false);
+						// Find the first UVs used, for now.
+						// TODO: support multiple UV channels.
 						if(lay->getTexture()){
-							// Export uvs.
 							const unsigned int uvwSrc = plLayerInterface::kUVWIdxMask & lay->getUVWSrc();
 							const hsMatrix44 uvwXform = lay->getTransform();
 							for (size_t j = 0; j < verts.size(); j++) {
 								hsVector3 txUvw = uvwXform.multPoint(verts[j].fUVWs[uvwSrc]);
-								// z will probably always be 0
-								// -1 for blender?
+								// WARN: z will probably always be 0
 								meshUVs[j] = glm::vec2(txUvw.X, -txUvw.Y);
-								//outfile << "vt " << txUvw.X << " " << -txUvw.Y << " " << txUvw.Z << std::endl;
 							}
 						}
-						
-							// find lowest underlay UV set.
-							// TODO: support undlerlay?
-							//
-							//
-							//
-							//
-							
-							
 					}
 					
 					const MeshInfos mesh = Resources::manager().registerMesh(fileName, meshIndices, meshPositions, meshNormals, meshUVs);
 					_objects.back().addSubObject(mesh);
-						//					if(hasTexture){
-						//						for (size_t j = 0; j < verts.size(); j++) {
-						//							hsVector3 txUvw = uvwXform.multPoint(verts[j].fUVWs[uvwSrc]);
-						//							// z will probably always be 0
-						//							// -1 for blender?
-						//							outfile << "vt " << txUvw.X << " " << -txUvw.Y << " " << txUvw.Z << std::endl;
-						//						}
-						//					}
-						
-						
-					
-							//outfile << "f " << indices[j]+1 << "/" << (hasTexture ? std::to_string(indices[j]+1) : "") << "/" << indices[j]+1;
-							//outfile <<  " " << indices[j+1]+1 << "/" << (hasTexture ? std::to_string(indices[j+1]+1) : "") << "/" << indices[j+1]+1;
-							//outfile <<  " " << indices[j+2]+1 << "/" << (hasTexture ? std::to_string(indices[j+2]+1) : "") << "/" << indices[j+2]+1;
-							//outfile << std::endl;
-					
-						//outfile.close();
-						
-						
 				}
-					
 			}
 		}
-		
 	}
 
-	const auto textureKeys = rm.getKeys(ploc, pdUnifiedTypeMap::ClassIndex("plMipmap")); // also support envmap
+	const auto textureKeys = rm.getKeys(ploc, pdUnifiedTypeMap::ClassIndex("plMipmap")); // TODO: also support envmap
 	Log::Info() << textureKeys.size() << " textures." << std::endl;
 
 	for(const auto & texture : textureKeys){
 		// For each texture, send it to the gpu and keep a reference and the name.
 		plMipmap* tex = plMipmap::Convert(texture->getObj());
 		
-		const std::string fileName = "texture__" + texture->getName().to_std_string() ;
-		Log::Info() << fileName << std::endl;
+		const std::string textureName = texture->getName().to_std_string() ;
 		
-		
-		uint8_t *dest;
-		size_t sizeComplete;
-		if(tex->getCompressionType() != plBitmap::kDirectXCompression){
-			//dest = (uint8_t*)(tex->getLevelData(0));
-			sizeComplete = tex->getLevelSize(0);
-			
-		} else {
-			size_t blocks = tex->GetUncompressedSize(0) / sizeof(size_t);
-			if ((tex->GetUncompressedSize(0)) % sizeof(size_t) != 0)
-				++blocks;
-			sizeComplete = tex->GetUncompressedSize(0);
-			//dest = reinterpret_cast<uint8_t*>(new size_t[blocks]);
-			//DecompressImage(0, fImageData, fLevelData[0].fSize);
-			//tex->DecompressImage(0, dest, tex->getLevelSize(0));
-		}
-		//hsFileStream outTex;
-		//outTex.open(ST::string(outputPath + "/" + fileName + ".png"), FileMode::fmWrite);
-		//SavePNG(&outTex, dest, sizeComplete, tex->getLevelWidth(0),  tex->getLevelHeight(0), tex->getBPP());
-		//outTex.close();
-		
-		
+		Resources::manager().registerTexture(textureName, tex);
+		_textures.push_back(textureName);
 	}
 }
 

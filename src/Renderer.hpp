@@ -3,6 +3,7 @@
 #include "Config.hpp"
 #include "Age.hpp"
 #include "input/Camera.hpp"
+#include "ScreenQuad.hpp"
 #include <gl3w/gl3w.h>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
@@ -42,6 +43,7 @@ protected:
 private:
 	
 	std::shared_ptr<Age> _age;
+	ScreenQuad _quad;
 	Camera _camera;
 	
 	void defaultGLSetup();

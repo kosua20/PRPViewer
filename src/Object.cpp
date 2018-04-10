@@ -5,9 +5,9 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 
-Object::Object(std::shared_ptr<ProgramInfos> prog, const glm::mat4 &model, const bool billboard) {
+Object::Object(const Type & type, std::shared_ptr<ProgramInfos> prog, const glm::mat4 &model) {
 	_program = prog;
-	_isBillboard = billboard;
+	_type = type;
 	_model = glm::mat4(model);
 }
 
@@ -30,15 +30,14 @@ void Object::draw(const glm::mat4& view, const glm::mat4& projection) const {
 	// Combine the three matrices.
 	
 	glm::mat4 MV = view * _model;
-	if(_isBillboard){
+	if(_type == Billboard || _type == BillboardY){
 		glDisable(GL_CULL_FACE);
 		glm::mat4 viewCopy = glm::transpose(glm::mat4(glm::mat3(view)));
-		//viewCopy[1][0] = 0.0;//view[2][0];
-		//viewCopy[1][1] = 1.0;//view[2][1];
-		//viewCopy[1][2] = 0.0;//view[2][0];
-		//viewCopy[2][1] = 0.0;//view[1][0];
-		//viewCopy[2][0] = 0.0;//view[0][2];
-		//viewCopy[2][2] = 1.0;//view[1][2];
+		if(_type == BillboardY){
+			viewCopy[1][0] = 0.0;
+			viewCopy[1][1] = 1.0;
+			viewCopy[1][2] = 0.0;
+		}
 		MV = view * glm::translate(glm::mat4(1.0f), glm::vec3(_model[3][0],_model[3][1],_model[3][2])) * viewCopy  * glm::scale(glm::mat4(1.0f), glm::vec3(_model[0][0]));
 	}
 	glm::mat4 MVP = projection * MV;
@@ -67,7 +66,7 @@ void Object::draw(const glm::mat4& view, const glm::mat4& projection) const {
 	}
 	glBindVertexArray(0);
 	glUseProgram(0);
-	if(_isBillboard){
+	if(_type == Billboard || _type == BillboardY){
 		glEnable(GL_CULL_FACE);
 	}
 

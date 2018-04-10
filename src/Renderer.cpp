@@ -15,6 +15,8 @@ Renderer::Renderer(Config & config) : _config(config) {
 	_renderResolution = (_config.internalVerticalResolution/_config.screenResolution[1]) * _config.screenResolution;
 	
 	defaultGLSetup();
+	
+	_quad.init("passthrough");
 	// Setup camera parameters.
 	_camera.projection(config.screenResolution[0]/config.screenResolution[1], 1.3f, 0.1f, 8000.0f);
 	loadAge("../../../data/spyroom.age");
@@ -24,6 +26,10 @@ void Renderer::draw(){
 	glViewport(0, 0, GLsizei(_config.screenResolution[0]), GLsizei(_config.screenResolution[1]));
 	glClearColor(0.45f,0.45f, 0.5f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	
+	// FIXME: move to attributes.
+	static int textureId = 0;
+	static bool showTextures = false;
 	
 	if (ImGui::Begin("Options")) {
 		static int current_item_id = 0;
@@ -35,6 +41,8 @@ void Renderer::draw(){
 		if(ImGui::BeginFilePicker("Load Age", "Load a .age file.", "../../../data/", selectedFile, false, false, {"age"})){
 			loadAge(selectedFile);
 			current_item_id = 0;
+			textureId = 0;
+			showTextures = false;
 		}
 		const std::string nameStr = "Current: " + (_age ? _age->getName() : "None");
 		ImGui::Text("%s", nameStr.c_str());
@@ -52,15 +60,22 @@ void Renderer::draw(){
 			
 		}
 		
+		ImGui::Checkbox("Show textures", &showTextures);
+		ImGui::SliderInt("slider int", &textureId, 0, _age->textures().size()-1);
 	}
 	ImGui::End();
 	
+	if(showTextures){
+		_quad.draw(Resources::manager().getTexture(_age->textures()[textureId]).id);
+		return;
+	}
 	glEnable(GL_DEPTH_TEST);
 	for(const auto & object : _age->objects()){
 		object.draw(_camera.view() , _camera.projection());
 	}
 	glDisable(GL_DEPTH_TEST);
 	
+	checkGLError();
 }
 
 void Renderer::loadAge(const std::string & path){

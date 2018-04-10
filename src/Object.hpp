@@ -8,10 +8,16 @@
 
 class Object {
 
+	
 public:
 
-
-	Object(std::shared_ptr<ProgramInfos> prog, const glm::mat4 & model, const bool billboard);
+	enum Type {
+		Default = 0,
+		Billboard = 1,
+		BillboardY = 2
+	};
+	
+	Object(const Type & type, std::shared_ptr<ProgramInfos> prog, const glm::mat4 & model);
 
 	~Object();
 	
@@ -33,7 +39,7 @@ private:
 	
 	std::vector<MeshInfos> _meshes;
 	
-	bool _isBillboard;
+	Type _type;
 	glm::mat4 _model;
 };
 

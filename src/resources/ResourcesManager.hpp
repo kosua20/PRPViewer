@@ -8,6 +8,8 @@
 #include <vector>
 #include <map>
 #include <memory>
+#include <PRP/Surface/plBitmap.h>
+#include <PRP/Surface/plMipmap.h>
 
 class Resources {
 	
@@ -46,7 +48,7 @@ public:
 	
 	const TextureInfos getTexture(const std::string & name, bool srgb = true);
 	
-	void registerTexture(const std::string & name, const TextureInfos & infos);
+	const TextureInfos registerTexture(const std::string & name, const plMipmap* textureData );
 	
 	const TextureInfos getCubemap(const std::string & name, bool srgb = true);
 	

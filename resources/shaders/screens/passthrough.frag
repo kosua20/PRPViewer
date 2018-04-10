@@ -9,11 +9,13 @@ in INTERFACE {
 uniform sampler2D screenTexture;
 
 // Output: the fragment color
-out vec3 fragColor;
+out vec4 fragColor;
 
 
 void main(){
 	
-	fragColor = texture(screenTexture, In.uv).rgb;
-	
+	fragColor = texture(screenTexture, In.uv);
+	if(fragColor.a == 0.0){
+		fragColor.rgb = vec3(1.0,0.0,0.0);
+	}
 }
