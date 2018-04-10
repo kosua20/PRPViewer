@@ -7,6 +7,8 @@
 #include <vector>
 #include <glm/glm.hpp>
 #include <string_theory/string>
+#include <Math/hsGeometry3.h>
+#include <Math/hsMatrix44.h>
 
 // Fix for Windows headers.
 #ifdef ERROR
@@ -69,6 +71,10 @@ public:
 	Log & operator<<(const glm::vec2& input);
 	
 	Log & operator<<(const ST::string& ststr);
+	
+	Log & operator<<(const hsMatrix44& input);
+	
+	Log & operator<<(const hsVector3& input);
 	
 public:
 	

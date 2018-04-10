@@ -182,3 +182,15 @@ Log &Log::operator<<(const ST::string& ststr){
 	_stream << ststr.to_std_string();
 	return *this;
 }
+
+Log & Log::operator<<(const hsMatrix44& input){
+	appendIfNeeded();
+	_stream << input.toString().to_std_string();
+	return *this;
+}
+
+Log & Log::operator<<(const hsVector3& input){
+	appendIfNeeded();
+	_stream << "vec3( " << input.X << ", " << input.Y << ", " << input.Z << " )";
+	return *this;
+}
