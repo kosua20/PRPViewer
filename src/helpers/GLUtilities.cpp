@@ -1,6 +1,7 @@
 #include "GLUtilities.hpp"
 #include "../resources/ImageUtilities.hpp"
 #include "Logger.hpp"
+#include <PRP/Surface/plBitmap.h>
 #include <vector>
 #include <algorithm>
 
@@ -136,7 +137,73 @@ GLuint GLUtilities::createProgram(const std::string & vertexContent, const std::
 	return id;
 }
 
-
+TextureInfos GLUtilities::loadTexture(const plMipmap * textureData){
+	TextureInfos infos;
+	infos.cubemap = false;
+	infos.hdr = false;
+	
+	// Create 2D texture.
+	GLuint textureId;
+	glGenTextures(1, &textureId);
+	glBindTexture(GL_TEXTURE_2D, textureId);
+	glPixelStorei(GL_UNPACK_ALIGNMENT,1);
+	
+	// Set proper max mipmap level.
+	unsigned int mipmapCount = textureData->getNumLevels();
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, mipmapCount == 1 ? 1000 : (mipmapCount-1));
+	
+	// Texture settings.
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	
+	// Compressed format.
+	if(textureData->getCompressionType() == plBitmap::kDirectXCompression){
+		GLenum format;
+		switch(textureData->getDXCompression()){
+			case plBitmap::kDXT1:
+				format = int(textureData->getBPP()) == 32 ? GL_COMPRESSED_RGBA_S3TC_DXT1_EXT : GL_COMPRESSED_RGB_S3TC_DXT1_EXT;
+				break;
+			case plBitmap::kDXT3:
+				format = GL_COMPRESSED_RGBA_S3TC_DXT3_EXT;
+				break;
+			case plBitmap::kDXT5:
+				format = GL_COMPRESSED_RGBA_S3TC_DXT5_EXT;
+				break;
+			default:
+				Log::Error()<< "Unable to find format." << std::endl;
+				return infos;
+		}
+		
+		for(unsigned int mipid = 0; mipid < mipmapCount; ++mipid){
+			// Magic formula for DXT miplevel size.
+			unsigned int mipmapSize = ((textureData->getLevelHeight(mipid)+3)/4)*((textureData->getLevelWidth(mipid)+3)/4)*int(textureData->getDXBlockSize());
+			glCompressedTexImage2D(GL_TEXTURE_2D, mipid, format,  textureData->getLevelWidth(mipid), textureData->getLevelHeight(mipid), 0,  mipmapSize, textureData->getLevelData(mipid));
+		}
+	} else {
+		// Regular format.
+		// TODO: check PNG and other are handled correctly.
+		const unsigned short bflags = textureData->getARGBType();
+		const GLenum format = (bflags == plBitmap::kInten8) ? GL_RED : (bflags == plBitmap::kAInten88 ? GL_RG : GL_RGBA);
+		const GLenum type = GL_UNSIGNED_BYTE;
+		const GLenum preciseFormat = format;
+		
+		for(unsigned int mipid = 0; mipid < mipmapCount; ++mipid){
+			glTexImage2D(GL_TEXTURE_2D, mipid, preciseFormat, textureData->getLevelWidth(mipid), textureData->getLevelHeight(mipid), 0, format, type, textureData->getLevelData(mipid));
+		}
+		
+	}
+	// If only level 0 was given, generate mipmaps pyramid automatically.
+	if(mipmapCount == 1){
+		glGenerateMipmap(GL_TEXTURE_2D);
+	}
+	checkGLError();
+	
+	infos.id = textureId;
+	infos.width = textureData->getWidth();
+	infos.height = textureData->getHeight();
+	infos.mipmap = mipmapCount;
+	return infos;
+}
 
 TextureInfos GLUtilities::loadTexture(const std::vector<std::string>& paths, bool sRGB){
 	TextureInfos infos;

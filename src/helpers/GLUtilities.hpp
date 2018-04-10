@@ -2,6 +2,7 @@
 #define GLUtilities_h
 #include "../resources/MeshUtilities.hpp"
 #include "../Framebuffer.hpp"
+#include <PRP/Surface/plMipmap.h>
 #include <gl3w/gl3w.h>
 #include <string>
 #include <vector>
@@ -54,6 +55,7 @@ public:
 	static GLuint createProgram(const std::string & vertexContent, const std::string & fragmentContent);
 	
 	// Texture loading.
+	static TextureInfos  loadTexture(const plMipmap * textureData);
 	/// 2D texture.
 	static TextureInfos loadTexture(const std::vector<std::string>& path, bool sRGB);
 	

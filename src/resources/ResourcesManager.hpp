@@ -8,8 +8,8 @@
 #include <vector>
 #include <map>
 #include <memory>
-#include <PRP/Surface/plBitmap.h>
-#include <PRP/Surface/plMipmap.h>
+
+class plMipmap;
 
 class Resources {
 	
