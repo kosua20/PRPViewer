@@ -5,8 +5,10 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 
-Object::Object(std::shared_ptr<ProgramInfos> prog) {
+Object::Object(std::shared_ptr<ProgramInfos> prog, const glm::mat4 &model, const bool billboard) {
 	_program = prog;
+	_isBillboard = billboard;
+	_model = glm::mat4(model);
 }
 
 Object::~Object() {}
@@ -26,7 +28,19 @@ void Object::update(const glm::mat4& model) {
 void Object::draw(const glm::mat4& view, const glm::mat4& projection) const {
 
 	// Combine the three matrices.
-	glm::mat4 MV = view;// * _model;
+	
+	glm::mat4 MV = view * _model;
+	if(_isBillboard){
+		glDisable(GL_CULL_FACE);
+		glm::mat4 viewCopy = glm::transpose(glm::mat4(glm::mat3(view)));
+		//viewCopy[1][0] = 0.0;//view[2][0];
+		//viewCopy[1][1] = 1.0;//view[2][1];
+		//viewCopy[1][2] = 0.0;//view[2][0];
+		//viewCopy[2][1] = 0.0;//view[1][0];
+		//viewCopy[2][0] = 0.0;//view[0][2];
+		//viewCopy[2][2] = 1.0;//view[1][2];
+		MV = view * glm::translate(glm::mat4(1.0f), glm::vec3(_model[3][0],_model[3][1],_model[3][2])) * viewCopy  * glm::scale(glm::mat4(1.0f), glm::vec3(_model[0][0]));
+	}
 	glm::mat4 MVP = projection * MV;
 	
 	// Compute the normal matrix
@@ -53,6 +67,9 @@ void Object::draw(const glm::mat4& view, const glm::mat4& projection) const {
 	}
 	glBindVertexArray(0);
 	glUseProgram(0);
+	if(_isBillboard){
+		glEnable(GL_CULL_FACE);
+	}
 
 }
 

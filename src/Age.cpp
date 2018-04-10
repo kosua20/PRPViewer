@@ -1,6 +1,7 @@
 #include "Age.hpp"
 #include "helpers/Logger.hpp"
 #include "resources/ResourcesManager.hpp"
+#include <glm/gtc/matrix_transform.hpp>
 #include <string>
 #include <ResManager/plResManager.h>
 #include <Debug/hsExceptions.hpp>
@@ -11,6 +12,7 @@
 #include <PRP/Object/plDrawInterface.h>
 #include <PRP/Object/plCoordinateInterface.h>
 #include <PRP/Geometry/plDrawableSpans.h>
+#include <PRP/Animation/plViewFaceModifier.h>
 #include <PRP/Surface/plLayer.h>
 #include <PRP/Surface/plBitmap.h>
 #include <PRP/Surface/plMipmap.h>
@@ -138,10 +140,10 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 				const auto matCenter = coord->getLocalToWorld();
 				if(objKey->getName() == "LinkInPointDefault"){
 					_linkingNamesCache.insert( _linkingNamesCache.begin(), objKey->getName().substr(11).to_std_string());
-					_linkingPoints[_linkingNamesCache.front()] = glm::vec3(matCenter(0,3), matCenter(2,3)+ 5.0f,-matCenter(1,3));
+					_linkingPoints[_linkingNamesCache.front()] = glm::vec3(matCenter(0,3), matCenter(2,3)+ 5.0f, -matCenter(1,3));
 				} else {
 					_linkingNamesCache.push_back(objKey->getName().substr(11).to_std_string());
-					_linkingPoints[_linkingNamesCache.back()] = glm::vec3(matCenter(0,3), matCenter(2,3)+ 5.0f,-matCenter(1,3));
+					_linkingPoints[_linkingNamesCache.back()] = glm::vec3(matCenter(0,3), matCenter(2,3)+ 5.0f, -matCenter(1,3));
 				}
 			}
 			
@@ -152,14 +154,42 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 			
 			
 			plDrawInterface* draw = plDrawInterface::Convert(obj->getDrawInterface()->getObj());
-			plCoordinateInterface* coord = NULL;
-			if (obj->getCoordInterface().Exists()){
-				coord = plCoordinateInterface::Convert(obj->getCoordInterface()->getObj());
-			}
-			//Log::Info() << "Object: " << objKey->getName() << ": ";
-			//Log::Info() << draw->getNumDrawables() << " drawables." << std::endl;
 			
-			_objects.emplace_back(Resources::manager().getProgram("object_basic"));
+			
+			
+			
+		
+			
+			bool isBillboard = false;
+			for(const auto & modKey : obj->getModifiers()){
+				if(modKey->getType() == kViewFaceModifier){
+					Log::Info() << "BILLBOARD" << std::endl;
+					plViewFaceModifier* modif = plViewFaceModifier::Convert(modKey->getObj());
+					Log::Info() << 	modif->getLocalToParent() << std::endl;
+					isBillboard = true;
+				}
+			}
+			
+			
+			glm::mat4 model = glm::mat4(1.0f);
+			
+			bool bakePosition = !obj->getCoordInterface().Exists();
+			if(!bakePosition ){
+				
+				hsMatrix44 localToWorld = hsMatrix44::Identity();
+				plCoordinateInterface* coord = plCoordinateInterface::Convert(obj->getCoordInterface()->getObj());
+				localToWorld = coord->getLocalToWorld();
+				if(isBillboard){Log::Info() << 	localToWorld << std::endl;}
+				model[0][0] = localToWorld(0,0); model[0][1] = localToWorld(1,0); model[0][2] = localToWorld(2,0); model[0][3] = localToWorld(3,0);
+				model[1][0] = localToWorld(0,1); model[1][1] = localToWorld(1,1); model[1][2] = localToWorld(2,1); model[1][3] = localToWorld(3,1);
+				model[2][0] = localToWorld(0,2); model[2][1] = localToWorld(1,2); model[2][2] = localToWorld(2,2); model[2][3] = localToWorld(3,2);
+				model[3][0] = localToWorld(0,3); model[3][1] = localToWorld(1,3); model[3][2] = localToWorld(2,3); model[3][3] = localToWorld(3,3);
+			}
+			model = glm::rotate(glm::mat4(1.0f), -float(M_PI_2), glm::vec3(1.0f,0.0f,0.0f)) * model;
+			
+			_objects.emplace_back(Resources::manager().getProgram("object_basic"), model, isBillboard);
+			
+			
 			for (size_t i = 0; i < draw->getNumDrawables(); ++i) {
 				if (draw->getDrawableKey(i) == -1){
 					continue;
@@ -186,10 +216,12 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 					
 					// Get the mesh internal representation.
 					plIcicle* ice = span->getIcicle(di.fIndices[id]);
+					
+					
 					//Log::Info() << "\t\t" << "Icicle " << id << " (" << di.fIndices[id] << ")";
 					//Log::Info() << span->getSpan(di.fIndices[id])
 					//Log::Info() << std::endl;
-					
+					const hsMatrix44 transfoMatrix = (bakePosition ? ice->getLocalToWorld() : hsMatrix44::Identity());
 					
 					//const glm::vec3 center(centerRaw.X, centerRaw.Z, -centerRaw.Y);
 					//Log::Info() << center << std::endl;
@@ -203,25 +235,15 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 					std::vector<glm::vec3> meshNormals(verts.size());
 					std::vector<glm::vec2> meshUVs(verts.size());
 					
-					// TODO: replace by complete conversion.
 					for (size_t j = 0; j < indices.size(); ++j) {
 						meshIndices[j] = (unsigned int)(indices[j]);
 					}
 					
 					for (size_t j = 0; j < verts.size(); j++) {
-						hsVector3 pos;
-						if (coord != NULL){
-							pos = coord->getLocalToWorld().multPoint(verts[j].fPos);// * 10.0f;
-						} else {
-							pos = ice->getLocalToWorld().multPoint(verts[j].fPos);// * 10.0f;
-						}
+						const hsVector3 pos = transfoMatrix.multPoint(verts[j].fPos);// * 10.0f;
 						const auto fnorm = verts[j].fNormal;
-						meshPositions[j] = glm::vec3(pos.X, pos.Z, -pos.Y);
-						meshNormals[j] = glm::vec3(fnorm.X, fnorm.Z, -fnorm.Y);
-					//	outfile << "v " << pos.X << " " << pos.Z << " " << (-pos.Y) << std::endl;
-						
-					//	outfile << "vn " <<  verts[j].fNormal.X << " " <<  verts[j].fNormal.Z << " " << (- verts[j].fNormal.Y) << std::endl;
-						
+						meshPositions[j] = glm::vec3(pos.X, pos.Y, pos.Z);
+						meshNormals[j] = glm::vec3(fnorm.X, fnorm.Y, fnorm.Z);
 					}
 					
 					bool hasTexture = false;
@@ -325,7 +347,7 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 		uint8_t *dest;
 		size_t sizeComplete;
 		if(tex->getCompressionType() != plBitmap::kDirectXCompression){
-			dest = (uint8_t*)(tex->getLevelData(0));
+			//dest = (uint8_t*)(tex->getLevelData(0));
 			sizeComplete = tex->getLevelSize(0);
 			
 		} else {
@@ -333,11 +355,9 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 			if ((tex->GetUncompressedSize(0)) % sizeof(size_t) != 0)
 				++blocks;
 			sizeComplete = tex->GetUncompressedSize(0);
-			dest = reinterpret_cast<uint8_t*>(new size_t[blocks]);
+			//dest = reinterpret_cast<uint8_t*>(new size_t[blocks]);
 			//DecompressImage(0, fImageData, fLevelData[0].fSize);
-			tex->DecompressImage(0, dest, tex->getLevelSize(0));
-			
-			
+			//tex->DecompressImage(0, dest, tex->getLevelSize(0));
 		}
 		//hsFileStream outTex;
 		//outTex.open(ST::string(outputPath + "/" + fileName + ".png"), FileMode::fmWrite);

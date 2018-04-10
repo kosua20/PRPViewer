@@ -6,13 +6,12 @@
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 
-
 class Object {
 
 public:
 
 
-	Object(std::shared_ptr<ProgramInfos> prog);
+	Object(std::shared_ptr<ProgramInfos> prog, const glm::mat4 & model, const bool billboard);
 
 	~Object();
 	
@@ -34,7 +33,8 @@ private:
 	
 	std::vector<MeshInfos> _meshes;
 	
-
+	bool _isBillboard;
+	glm::mat4 _model;
 };
 
 #endif
