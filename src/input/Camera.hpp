@@ -40,6 +40,8 @@ public:
 	const glm::mat4 view() const { return _view; }
 	const glm::mat4 projection() const { return _projection; }
 	
+	void setCenter(const glm::vec3 & newCenter);
+	
 private:
 	
 	void updateUsingJoystick(double frameTime);

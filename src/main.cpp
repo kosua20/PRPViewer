@@ -69,10 +69,10 @@ int main(int argc, char** argv) {
 		glfwWindowHint(GLFW_GREEN_BITS, mode->greenBits);
 		glfwWindowHint(GLFW_BLUE_BITS, mode->blueBits);
 		glfwWindowHint(GLFW_REFRESH_RATE, mode->refreshRate);
-		window = glfwCreateWindow(mode->width, mode->height, "GL_Template", glfwGetPrimaryMonitor(), NULL);
+		window = glfwCreateWindow(mode->width, mode->height, "PrpViewer", glfwGetPrimaryMonitor(), NULL);
 	} else {
 		// Create a window with a given size. Width and height are defined in the configuration.
-		window = glfwCreateWindow(config.initialWidth, config.initialHeight,"GL_Template", NULL, NULL);
+		window = glfwCreateWindow(config.initialWidth, config.initialHeight,"PrpViewer", NULL, NULL);
 	}
 	
 	if (!window) {
@@ -118,7 +118,7 @@ int main(int argc, char** argv) {
 	
 	ImGui::CreateContext();
 	ImGuiIO& io = ImGui::GetIO(); (void)io;
-	ImGui_ImplGlfwGL3_Init(window, true);
+	ImGui_ImplGlfwGL3_Init(window, false);
 	ImGui::StyleColorsDark();
 	//ImGui::GetStyle().ScaleAllSizes(config.screenDensity);
 	//ImGui::GetIO().FontGlobalScale = config.screenDensity;

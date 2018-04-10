@@ -15,7 +15,7 @@
 
 /// Singleton.
 Resources& Resources::manager(){
-	static Resources* res = new Resources("resources");
+	static Resources* res = new Resources("../../../resources");
 	return *res;
 }
 
@@ -231,6 +231,22 @@ const MeshInfos Resources::getMesh(const std::string & name){
 	return infos;
 }
 
+const MeshInfos Resources::registerMesh(const std::string & name, const std::vector<unsigned int> & indices, const std::vector<glm::vec3> & positions, const std::vector<glm::vec3> & normals, const std::vector<glm::vec2> & texcoords){
+	MeshInfos infos;
+	Mesh mesh;
+	//Init the mesh.
+	mesh.indices = indices;
+	mesh.positions = positions;
+	mesh.normals = normals;
+	mesh.texcoords = texcoords;
+	// If uv or positions are missing, tangent/binormals won't be computed.
+	//MeshUtilities::computeTangentsAndBinormals(mesh);
+	MeshUtilities::centerAndUnitMesh(mesh);
+	infos = GLUtilities::setupBuffers(mesh);
+	
+	_meshes[name] = infos;
+	return infos;
+}
 
 /// Texture methods.
 
@@ -275,6 +291,11 @@ const TextureInfos Resources::getTexture(const std::string & name, bool srgb){
 	Log::Error() << Log::Resources << "Unable to find texture named \"" << name << "\"." << std::endl;
 	return infos;
 }
+
+void Resources::registerTexture(const std::string &name, const TextureInfos &infos) {
+	_textures[name] = infos;
+}
+
 
 
 const TextureInfos Resources::getCubemap(const std::string & name, bool srgb){
@@ -402,4 +423,6 @@ std::string Resources::trim(const std::string & str, const std::string & del){
 
 
 Resources::~Resources(){ }
+
+
 

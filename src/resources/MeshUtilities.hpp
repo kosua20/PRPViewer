@@ -37,6 +37,8 @@ public:
 	/// Compute the tangents and binormal vectors for each vertex.
 	static void computeTangentsAndBinormals(Mesh & mesh);
 	
+	
+	
 };
 
 #endif 

@@ -1,5 +1,6 @@
 #include "Age.hpp"
 #include "helpers/Logger.hpp"
+#include "resources/ResourcesManager.hpp"
 #include <string>
 #include <ResManager/plResManager.h>
 #include <Debug/hsExceptions.hpp>
@@ -22,7 +23,6 @@
 #include <time.h>
 #include <unistd.h>
 #include <fstream>
-
 /*
 static void pl_png_write(png_structp png, png_bytep data, png_size_t size) {
 	hsStream* S = reinterpret_cast<hsStream*>(png_get_io_ptr(png));
@@ -76,9 +76,10 @@ void SavePNG(hsStream* S, const void* buf, size_t size,
 Age::Age(const std::string & path){
 	
 	const PlasmaVer plasmaVersion = PlasmaVer::pvMoul;
-	_rm.reset(new plResManager());
+	//rm.reset(new plResManager());
+	plResManager _rm;
 	
-	plAgeInfo* age = _rm->ReadAge(path, true);
+	plAgeInfo* age = _rm.ReadAge(path, true);
 	
 	_name = age->getAgeName().to_std_string();
 	
@@ -89,7 +90,7 @@ Age::Age(const std::string & path){
 	for(int i = 0 ; i < pageCount; ++i){
 		Log::Info() << "Page: " << age->getPageFilename(i, plasmaVersion) << " ";
 		const plLocation ploc = age->getPageLoc(i, plasmaVersion);
-		//loadMeshes(*_rm, ploc);
+		loadMeshes(_rm, ploc);
 		Log::Info() << std::endl;
 	}
 	Log::Info() << std::endl;
@@ -104,13 +105,24 @@ Age::Age(const std::string & path){
 	}
 	Log::Info() << std::endl;
 	
+	checkGLError();
+	Log::Info() << "Objects: " << _objects.size() << std::endl;
+	_rm.DelAge(age->getAgeName());
 }
 
+Age::~Age(){
+	//_rm->
+	for(const auto & obj : _objects){
+		obj.clean();
+	}
+	//_rm.reset();
+}
 
 void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 	plSceneNode* scene = rm.getSceneNode(ploc);
-	if(scene){
 	
+	if(scene){
+		
 		//Log::Info() << scene->getKey()->getName() << " (" << scene->getSceneObjects().size() << ")" << std::endl;
 		
 		for(const auto & objKey : scene->getSceneObjects()){
@@ -118,6 +130,22 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 			// and the used materials, referencing textures.
 			
 			plSceneObject* obj = plSceneObject::Convert(rm.getObject(objKey));
+			
+			//Log::Info() << objKey->getName() << std::endl;
+			if(objKey->getName().substr(0, 11) == "LinkInPoint" && obj->getCoordInterface().Exists()){
+				Log::Info() << objKey->getName() << std::endl;
+				plCoordinateInterface* coord = plCoordinateInterface::Convert(obj->getCoordInterface()->getObj());
+				const auto matCenter = coord->getLocalToWorld();
+				if(objKey->getName() == "LinkInPointDefault"){
+					_linkingNamesCache.insert( _linkingNamesCache.begin(), objKey->getName().substr(11).to_std_string());
+					_linkingPoints[_linkingNamesCache.front()] = glm::vec3(matCenter(0,3), matCenter(2,3)+ 5.0f,-matCenter(1,3));
+				} else {
+					_linkingNamesCache.push_back(objKey->getName().substr(11).to_std_string());
+					_linkingPoints[_linkingNamesCache.back()] = glm::vec3(matCenter(0,3), matCenter(2,3)+ 5.0f,-matCenter(1,3));
+				}
+			}
+			
+			
 			if(!obj->getDrawInterface().Exists()){
 				continue;
 			}
@@ -128,8 +156,10 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 			if (obj->getCoordInterface().Exists()){
 				coord = plCoordinateInterface::Convert(obj->getCoordInterface()->getObj());
 			}
-			Log::Info() << "Object: " << objKey->getName() << ": ";
-			Log::Info() << draw->getNumDrawables() << " drawables." << std::endl;
+			//Log::Info() << "Object: " << objKey->getName() << ": ";
+			//Log::Info() << draw->getNumDrawables() << " drawables." << std::endl;
+			
+			_objects.emplace_back(Resources::manager().getProgram("object_basic"));
 			for (size_t i = 0; i < draw->getNumDrawables(); ++i) {
 				if (draw->getDrawableKey(i) == -1){
 					continue;
@@ -138,14 +168,15 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 				// A span group multiple objects data/assets.
 				plDrawableSpans* span = plDrawableSpans::Convert(draw->getDrawable(i)->getObj());
 				plDISpanIndex di = span->getDIIndex(draw->getDrawableKey(i));
+				
 				// Ignore matrix-only span element. probably internal nodes ?
 				if ((di.fFlags & plDISpanIndex::kMatrixOnly) != 0){
 					continue;
 				}
-				Log::Info() << "\tIn drawable span " << i << " (" << span->getKey()->getName() << "): " << di.fIndices.size() << " indices." << std::endl;
+				//Log::Info() << "\tIn drawable span " << i << " (" << span->getKey()->getName() << "): " << di.fIndices.size() << " indices." << std::endl;
 					
 				for(size_t id = 0; id < di.fIndices.size(); ++id){
-					const std::string fileName = scene->getKey()->getName().to_std_string() + "__" + obj->getKey()->getName().to_std_string() + "__" + std::to_string(i) + "_" + std::to_string(id) ;
+					const std::string fileName = scene->getKey()->getName().to_std_string() + "_" + obj->getKey()->getName().to_std_string() + "_" + std::to_string(i) + "_" + std::to_string(id) ;
 //					std::ofstream outfile(outputPath + "/" + fileName + ".obj");
 //					if(!outfile.is_open()){
 //						std::cerr << "ISSUE" << std::endl;
@@ -155,15 +186,28 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 					
 					// Get the mesh internal representation.
 					plIcicle* ice = span->getIcicle(di.fIndices[id]);
-					Log::Info() << "\t\t" << "Icicle " << id << " (" << di.fIndices[id] << ")";
+					//Log::Info() << "\t\t" << "Icicle " << id << " (" << di.fIndices[id] << ")";
 					//Log::Info() << span->getSpan(di.fIndices[id])
-					Log::Info() << std::endl;
+					//Log::Info() << std::endl;
 					
 					
+					//const glm::vec3 center(centerRaw.X, centerRaw.Z, -centerRaw.Y);
+					//Log::Info() << center << std::endl;
 					
 					std::vector<plGBufferVertex> verts = span->getVerts(ice);
 					std::vector<unsigned short> indices = span->getIndices(ice);
 					//Log::Info() << "Num uvs: " << span->getBuffer(ice->getGroupIdx())->getNumUVs() << std::endl;
+					
+					std::vector<unsigned int> meshIndices(indices.size());
+					std::vector<glm::vec3> meshPositions(verts.size());
+					std::vector<glm::vec3> meshNormals(verts.size());
+					std::vector<glm::vec2> meshUVs(verts.size());
+					
+					// TODO: replace by complete conversion.
+					for (size_t j = 0; j < indices.size(); ++j) {
+						meshIndices[j] = (unsigned int)(indices[j]);
+					}
+					
 					for (size_t j = 0; j < verts.size(); j++) {
 						hsVector3 pos;
 						if (coord != NULL){
@@ -171,6 +215,9 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 						} else {
 							pos = ice->getLocalToWorld().multPoint(verts[j].fPos);// * 10.0f;
 						}
+						const auto fnorm = verts[j].fNormal;
+						meshPositions[j] = glm::vec3(pos.X, pos.Z, -pos.Y);
+						meshNormals[j] = glm::vec3(fnorm.X, fnorm.Z, -fnorm.Y);
 					//	outfile << "v " << pos.X << " " << pos.Z << " " << (-pos.Y) << std::endl;
 						
 					//	outfile << "vn " <<  verts[j].fNormal.X << " " <<  verts[j].fNormal.Z << " " << (- verts[j].fNormal.Y) << std::endl;
@@ -187,39 +234,57 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 							continue;
 						}
 						
-						Log::Info() << "\t\t\tMaterial: " << mat->getKey()->getName();
-						Log::Info() << ", " << mat->getLayers().size() << " layers. ";
-						Log::Info() << "Compo: " << mat->getCompFlags() << ", piggyback: " << mat->getPiggyBacks().size() << std::endl;
+						//Log::Info() << "\t\t\tMaterial: " << mat->getKey()->getName();
+						//Log::Info() << ", " << mat->getLayers().size() << " layers. ";
+						//Log::Info() << "Compo: " << mat->getCompFlags() << ", piggyback: " << mat->getPiggyBacks().size() << std::endl;
 						
 						for(size_t lid = 0; lid < mat->getLayers().size(); ++lid){
 							plLayerInterface* lay = plLayerInterface::Convert(mat->getLayers()[lid]->getObj(), false);
-							Log::Info() << "\t\t\t\t" << lay->getKey()->getName();
-							Log::Info() << ", flags: " << lay->getState().fBlendFlags << " " << lay->getState().fClampFlags << " " <<  lay->getState().fShadeFlags << " " <<  lay->getState().fZFlags  << " " <<  lay->getState().fMiscFlags << ".";
+							//Log::Info() << "\t\t\t\t" << lay->getKey()->getName();
+							//Log::Info() << ", flags: " << lay->getState().fBlendFlags << " " << lay->getState().fClampFlags << " " <<  lay->getState().fShadeFlags << " " <<  lay->getState().fZFlags  << " " <<  lay->getState().fMiscFlags << ".";
 							if(lay->getTexture()){
-								Log::Info() << " Texture: " << lay->getTexture()->getName() << ", UV: " << lay->getUVWSrc();
+							//	Log::Info() << " Texture: " << lay->getTexture()->getName() << ", UV: " << lay->getUVWSrc();
 								// Export uvs.
 								const unsigned int uvwSrc = lay->getUVWSrc();
 								const hsMatrix44 uvwXform = lay->getTransform();
 								for (size_t j = 0; j < verts.size(); j++) {
-									hsVector3 txUvw = uvwXform.multPoint(verts[j].fUVWs[uvwSrc]);
+									//hsVector3 txUvw = uvwXform.multPoint(verts[j].fUVWs[uvwSrc]);
 									// z will probably always be 0
 									// -1 for blender?
 									//outfile << "vt " << txUvw.X << " " << -txUvw.Y << " " << txUvw.Z << std::endl;
 								}
 								hasTexture = true;
 							}
-							Log::Info() << std::endl;
+							//Log::Info() << std::endl;
 							
 						}
+						
+						plLayerInterface* lay = plLayerInterface::Convert(mat->getLayers()[0]->getObj(), false);
+						if(lay->getTexture()){
+							// Export uvs.
+							const unsigned int uvwSrc = plLayerInterface::kUVWIdxMask & lay->getUVWSrc();
+							const hsMatrix44 uvwXform = lay->getTransform();
+							for (size_t j = 0; j < verts.size(); j++) {
+								hsVector3 txUvw = uvwXform.multPoint(verts[j].fUVWs[uvwSrc]);
+								// z will probably always be 0
+								// -1 for blender?
+								meshUVs[j] = glm::vec2(txUvw.X, -txUvw.Y);
+								//outfile << "vt " << txUvw.X << " " << -txUvw.Y << " " << txUvw.Z << std::endl;
+							}
+						}
+						
 							// find lowest underlay UV set.
 							// TODO: support undlerlay?
-							//						while (lay != NULL && lay->getUnderLay().Exists()){
-							//							lay = plLayerInterface::Convert(lay->getUnderLay()->getObj(), false);
-							//							Log::Info() << "AZE\t\t\t\t" << lay->getKey()->getName() << std::endl;
-							//						}
+							//
+							//
+							//
+							//
 							
 							
 					}
+					
+					const MeshInfos mesh = Resources::manager().registerMesh(fileName, meshIndices, meshPositions, meshNormals, meshUVs);
+					_objects.back().addSubObject(mesh);
 						//					if(hasTexture){
 						//						for (size_t j = 0; j < verts.size(); j++) {
 						//							hsVector3 txUvw = uvwXform.multPoint(verts[j].fUVWs[uvwSrc]);
@@ -230,12 +295,12 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 						//					}
 						
 						
-					for (size_t j = 0; j < indices.size(); j += 3) {
+					
 							//outfile << "f " << indices[j]+1 << "/" << (hasTexture ? std::to_string(indices[j]+1) : "") << "/" << indices[j]+1;
 							//outfile <<  " " << indices[j+1]+1 << "/" << (hasTexture ? std::to_string(indices[j+1]+1) : "") << "/" << indices[j+1]+1;
 							//outfile <<  " " << indices[j+2]+1 << "/" << (hasTexture ? std::to_string(indices[j+2]+1) : "") << "/" << indices[j+2]+1;
 							//outfile << std::endl;
-					}
+					
 						//outfile.close();
 						
 						
@@ -243,6 +308,7 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 					
 			}
 		}
+		
 	}
 
 	const auto textureKeys = rm.getKeys(ploc, pdUnifiedTypeMap::ClassIndex("plMipmap")); // also support envmap
@@ -280,6 +346,16 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 		
 		
 	}
+}
+
+const glm::vec3 Age::getDefaultLinkingPoint(){
+	if(_linkingPoints.count("LinkInPointDefault")>0){
+		return _linkingPoints["LinkInPointDefault"];
+	}
+	if(_linkingPoints.empty()){
+		return glm::vec3(0.0f,5.0f,0.0f);
+	}
+	return _linkingPoints[_linkingNamesCache.front()];
 }
 
 

@@ -42,7 +42,11 @@ public:
 	
 	const MeshInfos getMesh(const std::string & name);
 	
+	const MeshInfos registerMesh(const std::string & name, const std::vector<unsigned int> & indices, const std::vector<glm::vec3> & positions, const std::vector<glm::vec3> & normals, const std::vector<glm::vec2> & texcoords);
+	
 	const TextureInfos getTexture(const std::string & name, bool srgb = true);
+	
+	void registerTexture(const std::string & name, const TextureInfos & infos);
 	
 	const TextureInfos getCubemap(const std::string & name, bool srgb = true);
 	

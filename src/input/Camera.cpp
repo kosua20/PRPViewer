@@ -4,14 +4,15 @@
 #include <stdio.h>
 #include <glm/gtc/matrix_transform.hpp>
 #include <algorithm>
+#include "../helpers/InterfaceUtilities.hpp"
 #ifdef _WIN32
 #define M_PI	3.14159265358979323846
 #endif
 
 Camera::Camera()  {
 	//_verticalResolution = 720;
-	_speed = 1.2f;
-	_angularSpeed = 4.0f;
+	_speed = 7.0f;
+	_angularSpeed = 5.0f;
 	_fov = 1.91f;
 	_ratio = 4.0f/3.0f;
 	_near = 0.01f;
@@ -33,6 +34,11 @@ void Camera::reset(){
 	_radius = 1.0;
 }
 
+void Camera::setCenter(const glm::vec3 & newCenter){
+	_eye += newCenter - _center;
+	_center = newCenter;
+}
+
 void Camera::update(){
 	if(Input::manager().triggered(Input::KeyR)){
 		reset();
@@ -44,6 +50,19 @@ void Camera::update(){
 		_mode = TurnTable;
 		_radius = glm::length(_eye - _center);
 	}
+	if(Input::manager().pressed(Input::KeyUp)){
+		_speed += 1.0f;
+	}
+	if(Input::manager().pressed(Input::KeyDown)){
+		_speed -= 1.0f;
+		_speed = std::max(_speed, 0.0f);
+	}
+	
+	if (ImGui::Begin("Options")) {
+		ImGui::Text("Speed: %.1f", _speed);
+	}
+	ImGui::End();
+	
 }
 
 void Camera::physics(double frameTime){
@@ -142,6 +161,7 @@ void Camera::updateUsingKeyboard(double frameTime){
 	const glm::vec3 deltaLateral = _speed * (float)frameTime * _right;
 	// One step laterally vertical.
 	const glm::vec3 deltaVertical = _speed * (float)frameTime * _up;
+	
 	
 	
 	if(Input::manager().pressed(Input::KeyW)){ // Forward

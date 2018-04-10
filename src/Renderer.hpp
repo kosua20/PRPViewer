@@ -2,6 +2,7 @@
 #define Renderer_h
 #include "Config.hpp"
 #include "Age.hpp"
+#include "input/Camera.hpp"
 #include <gl3w/gl3w.h>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
@@ -37,12 +38,14 @@ protected:
 	
 	Config & _config;
 	glm::vec2 _renderResolution;
-	std::shared_ptr<Age> _age;
-	
 	
 private:
 	
+	std::shared_ptr<Age> _age;
+	Camera _camera;
+	
 	void defaultGLSetup();
+	void loadAge(const std::string & path);
 };
 
 #endif

@@ -206,7 +206,8 @@ void MeshUtilities::centerAndUnitMesh(Mesh & mesh){
 	
 	// Scale the mesh.
 	for(size_t i = 0; i < mesh.positions.size(); i++){
-		mesh.positions[i] /= maxi;
+		//mesh.positions[i] /= maxi;
+		mesh.positions[i] += centroid;
 	}
 
 }
