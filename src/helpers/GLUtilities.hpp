@@ -3,6 +3,7 @@
 #include "../resources/MeshUtilities.hpp"
 #include "../Framebuffer.hpp"
 #include <PRP/Surface/plMipmap.h>
+#include <PRP/Surface/plCubicEnvironmap.h>
 #include <gl3w/gl3w.h>
 #include <string>
 #include <vector>
@@ -56,6 +57,8 @@ public:
 	
 	// Texture loading.
 	static TextureInfos  loadTexture(const plMipmap * textureData);
+	
+	static TextureInfos loadCubemap(plCubicEnvironmap* textureData);
 	/// 2D texture.
 	static TextureInfos loadTexture(const std::vector<std::string>& path, bool sRGB);
 	

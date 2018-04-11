@@ -10,6 +10,7 @@
 #include <memory>
 
 class plMipmap;
+class plCubicEnvironmap;
 
 class Resources {
 	
@@ -50,6 +51,8 @@ public:
 	
 	const TextureInfos registerTexture(const std::string & name, const plMipmap* textureData );
 	
+	const TextureInfos registerCubemap(const std::string & name, plCubicEnvironmap* textureData );
+	
 	const TextureInfos getCubemap(const std::string & name, bool srgb = true);
 	
 	const std::string getShader(const std::string & name, const ShaderType & type);
@@ -60,11 +63,14 @@ public:
 	
 	void reload();
 	
+	void reset();
+	
 	static char * loadRawDataFromExternalFile(const std::string & path, size_t & size);
 	
 	static std::string loadStringFromExternalFile(const std::string & filename);
 	
 	static std::string trim(const std::string & str, const std::string & del);
+	
 	
 private:
 	

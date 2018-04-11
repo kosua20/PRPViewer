@@ -9,13 +9,14 @@ Object::Object(const Type & type, std::shared_ptr<ProgramInfos> prog, const glm:
 	_program = prog;
 	_type = type;
 	_model = glm::mat4(model);
+	
 }
 
 Object::~Object() {}
 
 
-void Object::addSubObject(const MeshInfos & infos){
-	_meshes.push_back(infos);
+void Object::addSubObject(const MeshInfos & infos, const std::string & textureName){
+	_subObjects.push_back({infos, textureName});
 }
 
 void Object::update(const glm::mat4& model) {
@@ -44,6 +45,7 @@ void Object::draw(const glm::mat4& view, const glm::mat4& projection) const {
 	
 	// Compute the normal matrix
 	glm::mat3 normalMatrix = glm::transpose(glm::inverse(glm::mat3(MV)));
+	glEnable(GL_BLEND);
 	// Select the program (and shaders).
 	glUseProgram(_program->id());
 
@@ -58,32 +60,37 @@ void Object::draw(const glm::mat4& view, const glm::mat4& projection) const {
 		glActiveTexture(GL_TEXTURE0 + i);
 		glBindTexture(_textures[i].cubemap ? GL_TEXTURE_CUBE_MAP : GL_TEXTURE_2D, _textures[i].id);
 	}*/
+
 	
-	for(const auto & mesh : _meshes){
-		glBindVertexArray(mesh.vId);
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh.eId);
-		glDrawElements(GL_TRIANGLES, mesh.count, GL_UNSIGNED_INT, (void*)0);
+	for(const auto & subObject : _subObjects){
+		const TextureInfos infos = Resources::manager().getTexture(subObject.texture);
+		
+		if(infos.cubemap){
+			glActiveTexture(GL_TEXTURE1);
+			glBindTexture(GL_TEXTURE_CUBE_MAP, infos.id);
+			glUniform1i(_program->uniform("useCubemap"), 1);
+		} else {
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, infos.id);
+			glUniform1i(_program->uniform("useCubemap"), 0);
+		}
+		glBindVertexArray(subObject.mesh.vId);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, subObject.mesh.eId);
+		glDrawElements(GL_TRIANGLES, subObject.mesh.count, GL_UNSIGNED_INT, (void*)0);
 	}
 	glBindVertexArray(0);
 	glUseProgram(0);
+	glDisable(GL_BLEND);
 	if(_type == Billboard || _type == BillboardY){
 		glEnable(GL_CULL_FACE);
 	}
-
+	
 }
 
 
 
 void Object::clean() const {
-	// FIXME: won't support shared meshes.
-	for(const auto & mesh : _meshes){
-		glDeleteVertexArrays(1, &mesh.vId);
-	}
-//
-//	for (auto & texture : _textures) {
-//		glDeleteTextures(1, &(texture.id));
-//	}
-//	glDeleteProgram(_program->id());
+	
 }
 
 

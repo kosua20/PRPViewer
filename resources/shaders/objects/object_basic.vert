@@ -11,6 +11,7 @@ uniform mat3 normalMatrix;
 
 // Output: tangent space matrix, position in view space and uv.
 out INTERFACE {
+	vec3 pos;
 	vec2 uv;
 	vec3 n;
 } Out ;
@@ -19,6 +20,7 @@ out INTERFACE {
 void main(){
 	// We multiply the coordinates by the MVP matrix, and ouput the result.
 	gl_Position = mvp * vec4(v, 1.0);
+	Out.pos = v;
 	Out.uv = uv;
-	Out.n = normalMatrix*n;
+	Out.n = n;
 }

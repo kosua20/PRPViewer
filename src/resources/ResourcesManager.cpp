@@ -256,6 +256,7 @@ const TextureInfos Resources::getTexture(const std::string & name, bool srgb){
 	if(_textures.count(name) > 0){
 		return _textures[name];
 	}
+	
 	// Else, find the corresponding file.
 	TextureInfos infos;
 	std::string path = getImagePath(name);
@@ -288,8 +289,10 @@ const TextureInfos Resources::getTexture(const std::string & name, bool srgb){
 	}
 	
 	// If couldn't file the image, return empty texture infos.
-	Log::Error() << Log::Resources << "Unable to find texture named \"" << name << "\"." << std::endl;
-	return infos;
+	if(!name.empty()){
+		Log::Error() << Log::Resources << "Unable to find texture named \"" << name << "\"." << std::endl;
+	}
+	return getTexture("DEBUG_DEFAULT");
 }
 
 const TextureInfos Resources::registerTexture(const std::string & name, const plMipmap* textureData ){
@@ -299,7 +302,23 @@ const TextureInfos Resources::registerTexture(const std::string & name, const pl
 	return infos;
 }
 
+const TextureInfos Resources::registerCubemap(const std::string & name, plCubicEnvironmap* textureData ){
+	TextureInfos infos = GLUtilities::loadCubemap(textureData);
+	_textures[name] = infos;
+	return infos;
+}
 
+void Resources::reset(){
+	
+	for(auto & tex : _textures){
+		glDeleteTextures(1, &(tex.second.id));
+	}
+	for(auto & mesh : _meshes){
+		glDeleteVertexArrays(1, &(mesh.second.vId));
+	}
+	_textures.clear();
+	_meshes.clear();
+}
 
 const TextureInfos Resources::getCubemap(const std::string & name, bool srgb){
 	// If texture already loaded, return it.

@@ -205,6 +205,85 @@ TextureInfos GLUtilities::loadTexture(const plMipmap * textureData){
 	return infos;
 }
 
+
+TextureInfos GLUtilities::loadCubemap(plCubicEnvironmap* textureData){
+	TextureInfos infos;
+	infos.cubemap = true;
+	infos.hdr = false;
+	
+	
+	// Create and bind texture.
+	GLuint textureId;
+	glGenTextures(1, &textureId);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, textureId);
+	
+	// Set proper max mipmap level.
+	unsigned int mipmapCount = textureData->getFace(0)->getNumLevels();
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAX_LEVEL, mipmapCount == 1 ? 1000 : (mipmapCount-1));
+	
+	// Texture settings.
+	glTexParameteri(GL_TEXTURE_CUBE_MAP,GL_TEXTURE_MIN_FILTER,GL_LINEAR_MIPMAP_LINEAR );
+	glTexParameteri(GL_TEXTURE_CUBE_MAP,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP,GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP,GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP,GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+	
+	static int cubemapTable[] = {1, 0, 4, 5, 2, 3};
+	
+	// Compressed format.
+	if(textureData->getCompressionType() == plBitmap::kDirectXCompression){
+		GLenum format;
+		switch(textureData->getDXCompression()){
+			case plBitmap::kDXT1:
+				format = int(textureData->getBPP()) == 32 ? GL_COMPRESSED_RGBA_S3TC_DXT1_EXT : GL_COMPRESSED_RGB_S3TC_DXT1_EXT;
+				break;
+			case plBitmap::kDXT3:
+				format = GL_COMPRESSED_RGBA_S3TC_DXT3_EXT;
+				break;
+			case plBitmap::kDXT5:
+				format = GL_COMPRESSED_RGBA_S3TC_DXT5_EXT;
+				break;
+			default:
+				Log::Error()<< "Unable to find format." << std::endl;
+				return infos;
+		}
+		
+		for(size_t side = 0; side < plCubicEnvironmap::kNumFaces; ++side){
+			const plMipmap * textureFace = textureData->getFace(side);
+			for(unsigned int mipid = 0; mipid < mipmapCount; ++mipid){
+				// Magic formula for DXT miplevel size.
+				unsigned int mipmapSize = ((textureFace->getLevelHeight(mipid)+3)/4)*((textureFace->getLevelWidth(mipid)+3)/4)*int(textureFace->getDXBlockSize());
+				glCompressedTexImage2D(GLenum(GL_TEXTURE_CUBE_MAP_POSITIVE_X + cubemapTable[side]), mipid, format,  textureFace->getLevelWidth(mipid), textureFace->getLevelHeight(mipid), 0,  mipmapSize, textureFace->getLevelData(mipid));
+			}
+		}
+	} else {
+		// Regular format.
+		// TODO: check PNG and other are handled correctly.
+		const unsigned short bflags = textureData->getARGBType();
+		const GLenum format = (bflags == plBitmap::kInten8) ? GL_RED : (bflags == plBitmap::kAInten88 ? GL_RG : GL_RGBA);
+		const GLenum type = GL_UNSIGNED_BYTE;
+		const GLenum preciseFormat = format;
+		for(size_t side = 0; side < plCubicEnvironmap::kNumFaces; ++side){
+			const plMipmap * textureFace = textureData->getFace(side);
+			for(unsigned int mipid = 0; mipid < mipmapCount; ++mipid){
+				glTexImage2D(GLenum(GL_TEXTURE_CUBE_MAP_POSITIVE_X + cubemapTable[side]), mipid, preciseFormat, textureFace->getLevelWidth(mipid), textureFace->getLevelHeight(mipid), 0, format, type, textureFace->getLevelData(mipid));
+			}
+		}
+		
+	}
+	// If only level 0 was given, generate mipmaps pyramid automatically.
+	if(mipmapCount == 1){
+		glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
+	}
+	checkGLError();
+	
+	infos.id = textureId;
+	infos.width = textureData->getFace(0)->getWidth();
+	infos.height = textureData->getFace(0)->getHeight();
+	infos.mipmap = mipmapCount;
+	return infos;
+}
+
 TextureInfos GLUtilities::loadTexture(const std::vector<std::string>& paths, bool sRGB){
 	TextureInfos infos;
 	infos.cubemap = false;

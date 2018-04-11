@@ -17,11 +17,16 @@ public:
 		BillboardY = 2
 	};
 	
+	struct SubObject {
+		MeshInfos mesh;
+		std::string texture;
+	};
+	
 	Object(const Type & type, std::shared_ptr<ProgramInfos> prog, const glm::mat4 & model);
 
 	~Object();
 	
-	void addSubObject(const MeshInfos & infos);
+	void addSubObject(const MeshInfos & infos, const std::string & textureName);
 	
 	/// Update function
 	void update(const glm::mat4& model);
@@ -37,10 +42,11 @@ private:
 	
 	std::shared_ptr<ProgramInfos> _program;
 	
-	std::vector<MeshInfos> _meshes;
+	std::vector<SubObject> _subObjects;
 	
 	Type _type;
 	glm::mat4 _model;
+	std::string _textureName;
 };
 
 #endif

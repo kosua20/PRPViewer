@@ -19,7 +19,11 @@ Renderer::Renderer(Config & config) : _config(config) {
 	_quad.init("passthrough");
 	// Setup camera parameters.
 	_camera.projection(config.screenResolution[0]/config.screenResolution[1], 1.3f, 0.1f, 8000.0f);
-	loadAge("../../../data/spyroom.age");
+	Resources::manager().getProgram("object_basic")->registerTexture("texture0", 0);
+	Resources::manager().getProgram("object_basic")->registerTexture("cubemap1", 1);
+
+	
+	loadAge("../../../data/uru/Nexus.age");
 }
 
 void Renderer::draw(){
@@ -61,7 +65,7 @@ void Renderer::draw(){
 		}
 		
 		ImGui::Checkbox("Show textures", &showTextures);
-		ImGui::SliderInt("slider int", &textureId, 0, _age->textures().size()-1);
+		ImGui::SliderInt("Texture ID", &textureId, 0, _age->textures().size()-1);
 	}
 	ImGui::End();
 	
@@ -70,6 +74,7 @@ void Renderer::draw(){
 		return;
 	}
 	glEnable(GL_DEPTH_TEST);
+	checkGLError();
 	for(const auto & object : _age->objects()){
 		object.draw(_camera.view() , _camera.projection());
 	}
@@ -80,6 +85,7 @@ void Renderer::draw(){
 
 void Renderer::loadAge(const std::string & path){
 	Log::Info() << "Should load " << path << std::endl;
+	Resources::manager().reset();
 	_age.reset(new Age(path));
 	// A Uru human is around 4/5 units in height apparently.
 	_camera.setCenter(_age->getDefaultLinkingPoint());
@@ -97,7 +103,7 @@ void Renderer::physics(double fullTime, double frameTime){
 
 /// Clean function
 void Renderer::clean() const {
-	
+	Resources::manager().reset();
 }
 
 /// Handle screen resizing

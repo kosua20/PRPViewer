@@ -16,6 +16,7 @@
 #include <PRP/Surface/plLayer.h>
 #include <PRP/Surface/plBitmap.h>
 #include <PRP/Surface/plMipmap.h>
+#include <PRP/Surface/plCubicEnvironmap.h>
 #include <Stream/plEncryptedStream.h>
 #include <Debug/plDebug.h>
 #include <Util/plPNG.h>
@@ -222,8 +223,32 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 					
 					
 					plKey matKey = span->getMaterials()[ice->getMaterialIdx()];
+					
+					std::string textureName = "";
 					if (matKey.Exists()) {
+						
 						hsGMaterial* mat = hsGMaterial::Convert(matKey->getObj(), false);
+						if (mat != NULL && mat->getLayers().size() > 0) {
+							plLayerInterface* lay = plLayerInterface::Convert(mat->getLayers()[0]->getObj(), false);
+							if(lay->getTexture() != NULL){
+								textureName = lay->getTexture()->getName().to_std_string();
+							}
+							while (lay != NULL && lay->getUnderLay().Exists()){
+								lay = plLayerInterface::Convert(lay->getUnderLay()->getObj(), false);
+								if(lay->getTexture() != NULL){
+									textureName = lay->getTexture()->getName().to_std_string();
+								}
+							}
+							const unsigned int uvwSrc = plLayerInterface::kUVWIdxMask & lay->getUVWSrc();
+							const hsMatrix44 uvwXform = lay->getTransform();
+							for (size_t j = 0; j < verts.size(); j++) {
+								hsVector3 txUvw = uvwXform.multPoint(verts[j].fUVWs[uvwSrc]);
+								// WARN: z will probably always be 0
+								meshUVs[j] = glm::vec2(txUvw.X, txUvw.Y);
+							}
+						}
+					}
+						/*hsGMaterial* mat = hsGMaterial::Convert(matKey->getObj(), false);
 						if (mat == NULL || mat->getLayers().empty()) {
 							continue;
 						}
@@ -238,27 +263,35 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 							//Log::Info() << ", flags: " << lay->getState().fBlendFlags << " " << lay->getState().fClampFlags << " " <<  lay->getState().fShadeFlags << " " <<  lay->getState().fZFlags  << " " <<  lay->getState().fMiscFlags << ".";
 							if(lay->getTexture()){
 								//	Log::Info() << " Texture: " << lay->getTexture()->getName() << ", UV: " << lay->getUVWSrc();
+								
 								hasTexture = true;
 							}
 							//Log::Info() << std::endl;
 						}
 						
-						plLayerInterface* lay = plLayerInterface::Convert(mat->getLayers()[0]->getObj(), false);
+						int ttid = 0;
+						plLayerInterface* lay = NULL;
+						do {
+							lay = plLayerInterface::Convert(mat->getLayers()[ttid]->getObj(), false);
+							++ttid;
+						} while(lay->getTexture() == NULL && ttid < mat->getLayers().size());
+						lay->getUnderLay()
 						// Find the first UVs used, for now.
 						// TODO: support multiple UV channels.
 						if(lay->getTexture()){
 							const unsigned int uvwSrc = plLayerInterface::kUVWIdxMask & lay->getUVWSrc();
 							const hsMatrix44 uvwXform = lay->getTransform();
+							textureName = lay->getTexture()->getName().to_std_string();
 							for (size_t j = 0; j < verts.size(); j++) {
 								hsVector3 txUvw = uvwXform.multPoint(verts[j].fUVWs[uvwSrc]);
 								// WARN: z will probably always be 0
-								meshUVs[j] = glm::vec2(txUvw.X, -txUvw.Y);
+								meshUVs[j] = glm::vec2(txUvw.X, txUvw.Y);
 							}
-						}
-					}
+						}*/
+					
 					
 					const MeshInfos mesh = Resources::manager().registerMesh(fileName, meshIndices, meshPositions, meshNormals, meshUVs);
-					_objects.back().addSubObject(mesh);
+					_objects.back().addSubObject(mesh, textureName);
 				}
 			}
 		}
@@ -276,6 +309,18 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 		Resources::manager().registerTexture(textureName, tex);
 		_textures.push_back(textureName);
 	}
+	
+	const auto envmapKeys = rm.getKeys(ploc, pdUnifiedTypeMap::ClassIndex("plCubicEnvironmap"));
+	Log::Info() << envmapKeys.size() << " cubemaps." << std::endl;
+	
+	for(const auto & envmap : envmapKeys){
+		plCubicEnvironmap* env = plCubicEnvironmap::Convert(envmap->getObj());
+		
+		const std::string envmapName = envmap->getName().to_std_string() ;
+		Resources::manager().registerCubemap(envmapName, env);
+		_textures.push_back(envmapName);
+	}
+	
 }
 
 const glm::vec3 Age::getDefaultLinkingPoint(){
