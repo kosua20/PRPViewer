@@ -41,11 +41,12 @@ private:
 	void loadMeshes( plResManager & rm, const plLocation& ploc);
 	
 	std::string _name;
-	//std::shared_ptr<plResManager> _rm;
+	std::shared_ptr<plResManager> _rm;
 	std::vector<Object> _objects;
 	std::vector<std::string> _textures;
 	std::map<std::string, glm::vec3> _linkingPoints;
 	std::vector<std::string> _linkingNamesCache;
+	
 	
 };
 

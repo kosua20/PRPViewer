@@ -23,7 +23,7 @@ Renderer::Renderer(Config & config) : _config(config) {
 	Resources::manager().getProgram("object_basic")->registerTexture("cubemap1", 1);
 
 	
-	loadAge("../../../data/uru/Nexus.age");
+	loadAge("../../../data/uru/spyroom.age");
 }
 
 void Renderer::draw(){
@@ -34,6 +34,8 @@ void Renderer::draw(){
 	// FIXME: move to attributes.
 	static int textureId = 0;
 	static bool showTextures = false;
+	static int objectId = 0;
+	static bool showObject = false;
 	
 	if (ImGui::Begin("Options")) {
 		static int current_item_id = 0;
@@ -66,6 +68,8 @@ void Renderer::draw(){
 		
 		ImGui::Checkbox("Show textures", &showTextures);
 		ImGui::SliderInt("Texture ID", &textureId, 0, _age->textures().size()-1);
+		ImGui::Checkbox("Show object", &showObject);
+		ImGui::SliderInt("Object ID", &objectId, 0, _age->objects().size()-1);
 	}
 	ImGui::End();
 	
@@ -73,10 +77,15 @@ void Renderer::draw(){
 		_quad.draw(Resources::manager().getTexture(_age->textures()[textureId]).id);
 		return;
 	}
+	
 	glEnable(GL_DEPTH_TEST);
 	checkGLError();
-	for(const auto & object : _age->objects()){
-		object.draw(_camera.view() , _camera.projection());
+	if(showObject){
+		_age->objects()[objectId].draw(_camera.view() , _camera.projection());
+	} else {
+		for(const auto & object : _age->objects()){
+			object.draw(_camera.view() , _camera.projection());
+		}
 	}
 	glDisable(GL_DEPTH_TEST);
 	

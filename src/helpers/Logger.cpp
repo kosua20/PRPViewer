@@ -194,3 +194,9 @@ Log & Log::operator<<(const hsVector3& input){
 	_stream << "vec3( " << input.X << ", " << input.Y << ", " << input.Z << " )";
 	return *this;
 }
+
+Log & Log::operator<<(const hsColorRGBA& input){
+	appendIfNeeded();
+	_stream << "(" << input.r << ", " << input.g << ", " << input.b << ")";
+	return *this;
+}

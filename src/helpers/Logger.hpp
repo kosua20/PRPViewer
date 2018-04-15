@@ -9,6 +9,7 @@
 #include <string_theory/string>
 #include <Math/hsGeometry3.h>
 #include <Math/hsMatrix44.h>
+#include <Sys/hsColor.h>
 
 // Fix for Windows headers.
 #ifdef ERROR
@@ -75,6 +76,8 @@ public:
 	Log & operator<<(const hsMatrix44& input);
 	
 	Log & operator<<(const hsVector3& input);
+	
+	Log & operator<<(const hsColorRGBA& input);
 	
 public:
 	

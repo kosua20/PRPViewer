@@ -45,7 +45,7 @@ public:
 	
 	const MeshInfos getMesh(const std::string & name);
 	
-	const MeshInfos registerMesh(const std::string & name, const std::vector<unsigned int> & indices, const std::vector<glm::vec3> & positions, const std::vector<glm::vec3> & normals, const std::vector<glm::vec2> & texcoords);
+	const MeshInfos registerMesh(const std::string & name, const std::vector<unsigned int> & indices, const std::vector<glm::vec3> & positions, const std::vector<glm::vec3> & normals, const std::vector<glm::u8vec4> & colors, const std::vector<std::vector<glm::vec3>> & texcoords);
 	
 	const TextureInfos getTexture(const std::string & name, bool srgb = true);
 	

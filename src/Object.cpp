@@ -3,7 +3,8 @@
 #include <stdio.h>
 #include <vector>
 #include <glm/gtc/matrix_transform.hpp>
-
+#include <PRP/Surface/hsGMaterial.h>
+#include <PRP/Surface/plLayer.h>
 
 Object::Object(const Type & type, std::shared_ptr<ProgramInfos> prog, const glm::mat4 &model) {
 	_program = prog;
@@ -15,8 +16,8 @@ Object::Object(const Type & type, std::shared_ptr<ProgramInfos> prog, const glm:
 Object::~Object() {}
 
 
-void Object::addSubObject(const MeshInfos & infos, const std::string & textureName){
-	_subObjects.push_back({infos, textureName});
+void Object::addSubObject(const MeshInfos & infos, hsGMaterial * material){
+	_subObjects.push_back({infos, material});
 }
 
 void Object::update(const glm::mat4& model) {
@@ -63,8 +64,10 @@ void Object::draw(const glm::mat4& view, const glm::mat4& projection) const {
 
 	
 	for(const auto & subObject : _subObjects){
-		const TextureInfos infos = Resources::manager().getTexture(subObject.texture);
+		plKey tex = plLayerInterface::Convert(subObject.material->getLayers()[0]->getObj(), false)->getTexture();
+		const TextureInfos infos = Resources::manager().getTexture(tex != NULL ? tex->getName().to_std_string() : "");//(^Resources::manager().getTexture(subObject.material->getLayers()[0]->getObj());
 		
+		//Log::Info() << subObject.mesh.uvCount << std::endl;
 		if(infos.cubemap){
 			glActiveTexture(GL_TEXTURE1);
 			glBindTexture(GL_TEXTURE_CUBE_MAP, infos.id);

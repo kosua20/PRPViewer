@@ -426,9 +426,8 @@ MeshInfos GLUtilities::setupBuffers(const Mesh & mesh){
 	MeshInfos infos;
 	GLuint vbo = 0;
 	GLuint vbo_nor = 0;
-	GLuint vbo_uv = 0;
-	GLuint vbo_tan = 0;
-	GLuint vbo_binor = 0;
+	GLuint vbo_color = 0;
+	std::vector<GLuint> vbo_uvs;
 	
 	// Create an array buffer to host the geometry data.
 	if(mesh.positions.size() > 0){
@@ -443,23 +442,29 @@ MeshInfos GLUtilities::setupBuffers(const Mesh & mesh){
 		glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * mesh.normals.size() * 3, &(mesh.normals[0]), GL_STATIC_DRAW);
 	}
 	
-	if(mesh.texcoords.size() > 0){
-		glGenBuffers(1, &vbo_uv);
-		glBindBuffer(GL_ARRAY_BUFFER, vbo_uv);
-		glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * mesh.texcoords.size() * 2, &(mesh.texcoords[0]), GL_STATIC_DRAW);
+	if(mesh.colors.size() > 0){
+		glGenBuffers(1, &vbo_color);
+		glBindBuffer(GL_ARRAY_BUFFER, vbo_color);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(unsigned char) * mesh.colors.size() * 4, &(mesh.colors[0]), GL_STATIC_DRAW);
 	}
 	
-	if(mesh.tangents.size() > 0){
-		glGenBuffers(1, &vbo_tan);
-		glBindBuffer(GL_ARRAY_BUFFER, vbo_tan);
-		glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * mesh.tangents.size() * 3, &(mesh.tangents[0]), GL_STATIC_DRAW);
+	for(const auto & texcoords : mesh.texcoords){
+		GLuint vbo_uv = 0;
+		if(texcoords.size() > 0){
+			glGenBuffers(1, &vbo_uv);
+			glBindBuffer(GL_ARRAY_BUFFER, vbo_uv);
+			glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * texcoords.size() * 3, &(texcoords[0]), GL_STATIC_DRAW);
+			vbo_uvs.push_back(vbo_uv);
+		}
 	}
 	
-	if(mesh.binormals.size() > 0){
-		glGenBuffers(1, &vbo_binor);
-		glBindBuffer(GL_ARRAY_BUFFER, vbo_binor);
-		glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * mesh.binormals.size() * 3, &(mesh.binormals[0]), GL_STATIC_DRAW);
-	}
+	
+//
+//	if(mesh.binormals.size() > 0){
+//		glGenBuffers(1, &vbo_binor);
+//		glBindBuffer(GL_ARRAY_BUFFER, vbo_binor);
+//		glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * mesh.binormals.size() * 3, &(mesh.binormals[0]), GL_STATIC_DRAW);
+//	}
 	
 	// Generate a vertex array.
 	GLuint vao = 0;
@@ -480,24 +485,28 @@ MeshInfos GLUtilities::setupBuffers(const Mesh & mesh){
 		glVertexAttribPointer(currentAttribute, 3, GL_FLOAT, GL_FALSE, 0, NULL);
 		++currentAttribute;
 	}
-	if(vbo_uv > 0){
+	
+	if(vbo_color > 0){
 		glEnableVertexAttribArray(currentAttribute);
-		glBindBuffer(GL_ARRAY_BUFFER, vbo_uv);
-		glVertexAttribPointer(currentAttribute, 2, GL_FLOAT, GL_FALSE, 0, NULL);
+		glBindBuffer(GL_ARRAY_BUFFER, vbo_color);
+		glVertexAttribPointer(currentAttribute, 4, GL_BYTE, GL_TRUE, 0, NULL);
 		++currentAttribute;
 	}
-	if(vbo_tan > 0){
-		glEnableVertexAttribArray(currentAttribute);
-		glBindBuffer(GL_ARRAY_BUFFER, vbo_tan);
-		glVertexAttribPointer(currentAttribute, 3, GL_FLOAT, GL_FALSE, 0, NULL);
-		++currentAttribute;
+	
+	for(const auto vbo_uv : vbo_uvs){
+		if(vbo_uv > 0){
+			glEnableVertexAttribArray(currentAttribute);
+			glBindBuffer(GL_ARRAY_BUFFER, vbo_uv);
+			glVertexAttribPointer(currentAttribute, 3, GL_FLOAT, GL_FALSE, 0, NULL);
+			++currentAttribute;
+		}
 	}
-	if(vbo_binor > 0){
-		glEnableVertexAttribArray(currentAttribute);
-		glBindBuffer(GL_ARRAY_BUFFER, vbo_binor);
-		glVertexAttribPointer(currentAttribute, 3, GL_FLOAT, GL_FALSE, 0, NULL);
-		++currentAttribute;
-	}
+//	if(vbo_binor > 0){
+//		glEnableVertexAttribArray(currentAttribute);
+//		glBindBuffer(GL_ARRAY_BUFFER, vbo_binor);
+//		glVertexAttribPointer(currentAttribute, 3, GL_FLOAT, GL_FALSE, 0, NULL);
+//		++currentAttribute;
+//	}
 	
 	// We load the indices data
 	GLuint ebo = 0;
@@ -510,6 +519,7 @@ MeshInfos GLUtilities::setupBuffers(const Mesh & mesh){
 	infos.vId = vao;
 	infos.eId = ebo;
 	infos.count = (GLsizei)mesh.indices.size();
+	infos.uvCount = mesh.texcoords.size();
 	return infos;
 }
 

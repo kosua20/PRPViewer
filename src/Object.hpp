@@ -6,6 +6,9 @@
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 
+
+class hsGMaterial;
+
 class Object {
 
 	
@@ -19,14 +22,14 @@ public:
 	
 	struct SubObject {
 		MeshInfos mesh;
-		std::string texture;
+		hsGMaterial * material;
 	};
 	
 	Object(const Type & type, std::shared_ptr<ProgramInfos> prog, const glm::mat4 & model);
 
 	~Object();
 	
-	void addSubObject(const MeshInfos & infos, const std::string & textureName);
+	void addSubObject(const MeshInfos & infos, hsGMaterial * material);
 	
 	/// Update function
 	void update(const glm::mat4& model);
@@ -46,7 +49,7 @@ private:
 	
 	Type _type;
 	glm::mat4 _model;
-	std::string _textureName;
+	
 };
 
 #endif

@@ -35,7 +35,7 @@ struct MeshInfos {
 	GLuint vId;
 	GLuint eId;
 	GLsizei count;
-
+	size_t uvCount;
 	MeshInfos() : vId(0), eId(0), count(0) {}
 
 };

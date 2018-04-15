@@ -7,12 +7,11 @@
 
 // A mesh will be represented by a struct. For now, material information and elements/groups are not retrieved from the .obj.
 typedef struct {
+	std::vector<unsigned int> indices;
 	std::vector<glm::vec3> positions;
 	std::vector<glm::vec3> normals;
-	std::vector<glm::vec3> tangents;
-	std::vector<glm::vec3> binormals;
-	std::vector<glm::vec2> texcoords;
-	std::vector<unsigned int> indices;
+	std::vector<glm::u8vec4> colors;
+	std::vector<std::vector<glm::vec3>> texcoords;
 } Mesh;
 
 

@@ -231,17 +231,19 @@ const MeshInfos Resources::getMesh(const std::string & name){
 	return infos;
 }
 
-const MeshInfos Resources::registerMesh(const std::string & name, const std::vector<unsigned int> & indices, const std::vector<glm::vec3> & positions, const std::vector<glm::vec3> & normals, const std::vector<glm::vec2> & texcoords){
+const MeshInfos Resources::registerMesh(const std::string & name, const std::vector<unsigned int> & indices, const std::vector<glm::vec3> & positions, const std::vector<glm::vec3> & normals, const std::vector<glm::u8vec4> & colors, const std::vector<std::vector<glm::vec3>> & texcoords){
 	MeshInfos infos;
 	Mesh mesh;
 	//Init the mesh.
 	mesh.indices = indices;
 	mesh.positions = positions;
 	mesh.normals = normals;
+	mesh.colors = colors;
 	mesh.texcoords = texcoords;
+	
 	// If uv or positions are missing, tangent/binormals won't be computed.
 	//MeshUtilities::computeTangentsAndBinormals(mesh);
-	MeshUtilities::centerAndUnitMesh(mesh);
+	//MeshUtilities::centerAndUnitMesh(mesh);
 	infos = GLUtilities::setupBuffers(mesh);
 	
 	_meshes[name] = infos;
@@ -290,7 +292,7 @@ const TextureInfos Resources::getTexture(const std::string & name, bool srgb){
 	
 	// If couldn't file the image, return empty texture infos.
 	if(!name.empty()){
-		Log::Error() << Log::Resources << "Unable to find texture named \"" << name << "\"." << std::endl;
+		//Log::Error() << Log::Resources << "Unable to find texture named \"" << name << "\"." << std::endl;
 	}
 	return getTexture("DEBUG_DEFAULT");
 }

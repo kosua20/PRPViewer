@@ -26,63 +26,16 @@
 #include <time.h>
 #include <unistd.h>
 #include <fstream>
-/*
-static void pl_png_write(png_structp png, png_bytep data, png_size_t size) {
-	hsStream* S = reinterpret_cast<hsStream*>(png_get_io_ptr(png));
-	S->write(size, reinterpret_cast<const uint8_t*>(data));
-}
 
-void SavePNG(hsStream* S, const void* buf, size_t size,
-						uint32_t width, uint32_t height, int pixelSize) {
-	png_structp fPngWriter;
-	png_infop   fPngInfo;
-	
-	
-	
-	fPngWriter = png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
-	if (!fPngWriter)
-		throw hsPNGException(__FILE__, __LINE__, "Error initializing PNG writer");
-	
-	fPngInfo = png_create_info_struct(fPngWriter);
-	if (!fPngInfo) {
-		png_destroy_write_struct(&fPngWriter, NULL);
-		fPngWriter = NULL;
-		throw hsPNGException(__FILE__, __LINE__, "Error initializing PNG info structure");
-	}
-	png_set_write_fn(fPngWriter, (png_voidp)S, &pl_png_write, NULL);
-	png_set_IHDR(fPngWriter, fPngInfo, width, height, 8,
-				 PNG_COLOR_TYPE_RGB_ALPHA, PNG_INTERLACE_NONE,
-				 PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT);
-	
-	// Plasma uses BGR for DirectX (TODO: Does HSPlasma need this?)
-	//png_set_bgr(pi.fPngWriter);
-	
-	png_write_info(fPngWriter, fPngInfo);
-	
-	png_bytep src = reinterpret_cast<png_bytep>(const_cast<void*>(buf));
-	std::unique_ptr<png_bytep[]> rows(new png_bytep[height]);
-	const unsigned int stride = width * pixelSize / 8;
-	for (size_t i = 0; i < height; ++i) {
-		rows[i] = src + (i * stride);
-		if (rows[i] + stride > src + size)
-			throw hsPNGException(__FILE__, __LINE__, "PNG input buffer is too small");
-	}
-	
-	png_write_image(fPngWriter, rows.get());
-	png_write_end(fPngWriter, fPngInfo);
-	png_destroy_write_struct(&fPngWriter, &fPngInfo);
-}
-
-*/
 
 
 Age::Age(const std::string & path){
 	
 	const PlasmaVer plasmaVersion = PlasmaVer::pvMoul;
-	//rm.reset(new plResManager());
-	plResManager _rm;
+	_rm.reset(new plResManager());
+	//plResManager _rm;
 	
-	plAgeInfo* age = _rm.ReadAge(path, true);
+	plAgeInfo* age = _rm->ReadAge(path, true);
 	
 	_name = age->getAgeName().to_std_string();
 	
@@ -93,7 +46,7 @@ Age::Age(const std::string & path){
 	for(int i = 0 ; i < pageCount; ++i){
 		Log::Info() << "Page: " << age->getPageFilename(i, plasmaVersion) << " ";
 		const plLocation ploc = age->getPageLoc(i, plasmaVersion);
-		loadMeshes(_rm, ploc);
+		loadMeshes(*_rm, ploc);
 		Log::Info() << std::endl;
 	}
 	Log::Info() << std::endl;
@@ -103,14 +56,14 @@ Age::Age(const std::string & path){
 	for(int i = 0 ; i < commmonCount; ++i){
 		Log::Info() << "Page: " << age->getCommonPageFilename(i, plasmaVersion) << " ";
 		const plLocation ploc = age->getCommonPageLoc(i, plasmaVersion);
-		loadMeshes(_rm, ploc);
+		loadMeshes(*_rm, ploc);
 		Log::Info() << std::endl;
 	}
 	Log::Info() << std::endl;
 	
 	checkGLError();
 	Log::Info() << "Objects: " << _objects.size() << std::endl;
-	_rm.DelAge(age->getAgeName());
+	//_rm.DelAge(age->getAgeName());
 	
 	
 }
@@ -200,36 +153,222 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 					// if we have to bake the icicle specific position, use it.
 					const hsMatrix44 transfoMatrix = (bakePosition ? ice->getLocalToWorld() : hsMatrix44::Identity());
 					
+					
 					std::vector<plGBufferVertex> verts = span->getVerts(ice);
 					std::vector<unsigned short> indices = span->getIndices(ice);
+					const unsigned int uvCount = span->getBuffer(ice->getGroupIdx())->getNumUVs();
 					
 					std::vector<unsigned int> meshIndices(indices.size());
 					std::vector<glm::vec3> meshPositions(verts.size());
 					std::vector<glm::vec3> meshNormals(verts.size());
-					std::vector<glm::vec2> meshUVs(verts.size());
+					std::vector<std::vector<glm::vec3>> meshUVs(uvCount, std::vector<glm::vec3>(verts.size()));
+					std::vector<glm::u8vec4> meshColors(verts.size());
 					
 					for (size_t j = 0; j < indices.size(); ++j) {
 						meshIndices[j] = (unsigned int)(indices[j]);
 					}
+					
 					
 					for (size_t j = 0; j < verts.size(); j++) {
 						const hsVector3 pos = transfoMatrix.multPoint(verts[j].fPos);
 						const auto fnorm = verts[j].fNormal;
 						meshPositions[j] = glm::vec3(pos.X, pos.Y, pos.Z);
 						meshNormals[j] = glm::vec3(fnorm.X, fnorm.Y, fnorm.Z);
+						const unsigned int color = verts[j].fColor;
+						meshColors[j] = glm::u8vec4(int((color >> 16) & 0xFF), int((color >> 8) & 0xFF) , int(color & 0xFF), int((color >> 24) & 0xFF));
+						for(size_t uvid = 0; uvid < uvCount; ++uvid){
+							const hsVector3 uvCoords = verts[j].fUVWs[uvid];
+							meshUVs[uvid][j] = glm::vec3(uvCoords.X, uvCoords.Y, uvCoords.Z);
+							
+						}
 					}
 					
-					bool hasTexture = false;
+					
 					
 					
 					plKey matKey = span->getMaterials()[ice->getMaterialIdx()];
 					
 					std::string textureName = "";
+					Log::Info() << objKey->getName() << ", UV Count" << uvCount << std::endl;
+					const unsigned int iceflags = ice->getProps();
+					Log::Info() << "Span flags: ";
+					if(iceflags & plSpan::kLiteMaterial){ Log::Info() << "kLiteMaterial" << ", "; }
+					if(iceflags & plSpan::kPropNoDraw){ Log::Info() << "kPropNoDraw" << ", "; }
+					if(iceflags & plSpan::kPropNoShadowCast){ Log::Info() << "kPropNoShadowCast" << ", "; }
+					if(iceflags & plSpan::kPropFacesSortable){ Log::Info() << "kPropFacesSortable" << ", "; }
+					if(iceflags & plSpan::kPropVolatile){ Log::Info() << "kPropVolatile" << ", "; }
+					if(iceflags & plSpan::kWaterHeight){ Log::Info() << "kWaterHeight" << ", "; }
+					if(iceflags & plSpan::kPropRunTimeLight){ Log::Info() << "kPropRunTimeLight" << ", "; }
+					if(iceflags & plSpan::kPropReverseSort){ Log::Info() << "kPropReverseSort" << ", "; }
+					if(iceflags & plSpan::kPropHasPermaLights){ Log::Info() << "kPropHasPermaLights" << ", "; }
+					if(iceflags & plSpan::kPropHasPermaProjs){ Log::Info() << "kPropHasPermaProjs" << ", "; }
+					if(iceflags & plSpan::kLiteVtxPreshaded){ Log::Info() << "kLiteVtxPreshaded" << ", "; }
+					if(iceflags & plSpan::kLiteVtxNonPreshaded){ Log::Info() << "kLiteVtxNonPreshaded" << ", "; }
+					if(iceflags & plSpan::kLiteProjection){ Log::Info() << "kLiteProjection" << ", "; }
+					if(iceflags & plSpan::kLiteShadowErase){ Log::Info() << "kLiteShadowErase" << ", "; }
+					if(iceflags & plSpan::kLiteShadow){ Log::Info() << "kLiteShadow" << ", "; }
+					if(iceflags & plSpan::kPropMatHasSpecular){ Log::Info() << "kPropMatHasSpecular" << ", "; }
+					if(iceflags & plSpan::kPropProjAsVtx){ Log::Info() << "kPropProjAsVtx" << ", "; }
+					if(iceflags & plSpan::kPropSkipProjection){ Log::Info() << "kPropSkipProjection" << ", "; }
+					if(iceflags & plSpan::kPropNoShadow){ Log::Info() << "kPropNoShadow" << ", "; }
+					if(iceflags & plSpan::kPropForceShadow){ Log::Info() << "kPropForceShadow" << ", "; }
+					if(iceflags & plSpan::kPropDisableNormal){ Log::Info() << "kPropDisableNormal" << ", "; }
+					if(iceflags & plSpan::kPropCharacter){ Log::Info() << "kPropCharacter" << ", "; }
+					if(iceflags & plSpan::kPartialSort){ Log::Info() << "kPartialSort" << ", "; }
+					if(iceflags & plSpan::kVisLOS){ Log::Info() << "kVisLOS" << ", "; }
+					Log::Info() << std::endl;
+					
 					if (matKey.Exists()) {
-						
+					
 						hsGMaterial* mat = hsGMaterial::Convert(matKey->getObj(), false);
 						if (mat != NULL && mat->getLayers().size() > 0) {
-							plLayerInterface* lay = plLayerInterface::Convert(mat->getLayers()[0]->getObj(), false);
+							
+							Log::Info() << "Material " << mat->getKey()->getName() << std::endl;
+							const unsigned int cflags = mat->getCompFlags();
+							Log::Info() << "\tCompflags: ";
+							if(cflags & hsGMaterial::kCompShaded){ Log::Info() << "kCompShaded" << ", ";}
+							if(cflags & hsGMaterial::kCompEnvironMap){ Log::Info() << "kCompEnvironMap" << ", ";}
+							if(cflags & hsGMaterial::kCompProjectOnto){ Log::Info() << "kCompProjectOnto" << ", ";}
+							if(cflags & hsGMaterial::kCompSoftShadow){ Log::Info() << "kCompSoftShadow" << ", ";}
+							if(cflags & hsGMaterial::kCompSpecular){ Log::Info() << "kCompSpecular" << ", ";}
+							if(cflags & hsGMaterial::kCompTwoSided){ Log::Info() << "kCompTwoSided" << ", ";}
+							if(cflags & hsGMaterial::kCompDrawAsSplats){ Log::Info() << "kCompDrawAsSplats" << ", ";}
+							if(cflags & hsGMaterial::kCompAdjusted){ Log::Info() << "kCompAdjusted" << ", ";}
+							if(cflags & hsGMaterial::kCompNoSoftShadow){ Log::Info() << "kCompNoSoftShadow" << ", ";}
+							if(cflags & hsGMaterial::kCompDynamic){ Log::Info() << "kCompDynamic" << ", ";}
+							if(cflags & hsGMaterial::kCompDecal){ Log::Info() << "kCompDecal" << ", ";}
+							if(cflags & hsGMaterial::kCompIsEmissive){ Log::Info() << "kCompIsEmissive" << ", ";}
+							if(cflags & hsGMaterial::kCompIsLightMapped){ Log::Info() << "kCompIsLightMapped" << ", ";}
+							if(cflags & hsGMaterial::kCompNeedsBlendChannel){ Log::Info() << "kCompNeedsBlendChannel" << ", ";}
+							Log::Info() << std::endl;
+							Log::Info() << "\tLayers: " <<  mat->getLayers().size() << std::endl;
+							for(size_t lid = 0; lid < mat->getLayers().size(); ++lid){
+								plLayerInterface* lay = plLayerInterface::Convert(mat->getLayers()[lid]->getObj(), false);
+								if(lay->getTexture() != NULL){
+									Log::Info() << "\t\tTexture: " << lay->getTexture()->getName() << ", using UV " << (lay->getUVWSrc() & plLayerInterface::kUVWIdxMask) << " and LOD bias " << lay->getLODBias() << "." << std::endl;
+									
+								}
+								Log::Info() << "\t\tOpacity: " << lay->getOpacity() <<", ";
+								Log::Info() << "Power: " << lay->getSpecularPower() <<", ";
+								Log::Info() << std::endl;
+								Log::Info() << "\t\tAmb: " << lay->getAmbient() <<", ";
+								Log::Info() << "Pres: " << lay->getPreshade() <<", ";
+								Log::Info() << "Spec: " << lay->getSpecular() <<", ";
+								Log::Info() << "Run: " << lay->getRuntime() <<", ";
+								Log::Info() << std::endl;
+								
+								const unsigned int fblend = lay->getState().fBlendFlags;
+								const unsigned int fclamp = lay->getState().fClampFlags;
+								const unsigned int fmisc = lay->getState().fMiscFlags;
+								const unsigned int fshade = lay->getState().fShadeFlags;
+								const unsigned int fz = lay->getState().fZFlags;
+								
+								Log::Info() << "\t\tBlend: ";
+								if(fblend & hsGMatState::kBlendTest){ Log::Info() << "kBlendTest" << ", "; }
+								if(fblend & hsGMatState::kBlendAlpha){ Log::Info() << "kBlendAlpha" << ", "; }
+								if(fblend & hsGMatState::kBlendMult){ Log::Info() << "kBlendMult" << ", "; }
+								if(fblend & hsGMatState::kBlendAdd){ Log::Info() << "kBlendAdd" << ", "; }
+								if(fblend & hsGMatState::kBlendAddColorTimesAlpha){ Log::Info() << "kBlendAddColorTimesAlpha" << ", "; }
+								if(fblend & hsGMatState::kBlendAntiAlias){ Log::Info() << "kBlendAntiAlias" << ", "; }
+								if(fblend & hsGMatState::kBlendDetail){ Log::Info() << "kBlendDetail" << ", "; }
+								if(fblend & hsGMatState::kBlendNoColor){ Log::Info() << "kBlendNoColor" << ", "; }
+								if(fblend & hsGMatState::kBlendMADD){ Log::Info() << "kBlendMADD" << ", "; }
+								if(fblend & hsGMatState::kBlendDot3){ Log::Info() << "kBlendDot3" << ", "; }
+								if(fblend & hsGMatState::kBlendAddSigned){ Log::Info() << "kBlendAddSigned" << ", "; }
+								if(fblend & hsGMatState::kBlendAddSigned2X){ Log::Info() << "kBlendAddSigned2X" << ", "; }
+								//if(fblend & kBlendMask){ Log::Info() << "kBlendMask" << ", "; }
+								if(fblend & hsGMatState::kBlendInvertAlpha){ Log::Info() << "kBlendInvertAlpha" << ", "; }
+								if(fblend & hsGMatState::kBlendInvertColor){ Log::Info() << "kBlendInvertColor" << ", "; }
+								if(fblend & hsGMatState::kBlendAlphaMult){ Log::Info() << "kBlendAlphaMult" << ", "; }
+								if(fblend & hsGMatState::kBlendAlphaAdd){ Log::Info() << "kBlendAlphaAdd" << ", "; }
+								if(fblend & hsGMatState::kBlendNoVtxAlpha){ Log::Info() << "kBlendNoVtxAlpha" << ", "; }
+								if(fblend & hsGMatState::kBlendNoTexColor){ Log::Info() << "kBlendNoTexColor" << ", "; }
+								if(fblend & hsGMatState::kBlendNoTexAlpha){ Log::Info() << "kBlendNoTexAlpha" << ", "; }
+								if(fblend & hsGMatState::kBlendInvertVtxAlpha){ Log::Info() << "kBlendInvertVtxAlpha" << ", "; }
+								if(fblend & hsGMatState::kBlendAlphaAlways){ Log::Info() << "kBlendAlphaAlways" << ", "; }
+								if(fblend & hsGMatState::kBlendInvertFinalColor){ Log::Info() << "kBlendInvertFinalColor" << ", "; }
+								if(fblend & hsGMatState::kBlendInvertFinalAlpha){ Log::Info() << "kBlendInvertFinalAlpha" << ", "; }
+								if(fblend & hsGMatState::kBlendEnvBumpNext){ Log::Info() << "kBlendEnvBumpNext" << ", "; }
+								if(fblend & hsGMatState::kBlendSubtract){ Log::Info() << "kBlendSubtract" << ", "; }
+								if(fblend & hsGMatState::kBlendRevSubtract){ Log::Info() << "kBlendRevSubtract" << ", "; }
+								if(fblend & hsGMatState::kBlendAlphaTestHigh){ Log::Info() << "kBlendAlphaTestHigh" << ", "; }
+								Log::Info() << std::endl;
+								
+								Log::Info() << "\t\tClamp: ";
+								if(fclamp == hsGMatState::kClampTextureU){ Log::Info() << "kClampTextureU" << ", "; }
+								if(fclamp == hsGMatState::kClampTextureV){ Log::Info() << "kClampTextureV" << ", "; }
+								if(fclamp == hsGMatState::kClampTexture){ Log::Info() << "kClampTexture" << ", "; }
+								Log::Info() << std::endl;
+								
+								Log::Info() << "\t\tMisc: ";
+								if(fmisc & hsGMatState::kMiscWireFrame){ Log::Info() << "kMiscWireFrame" << ", "; }
+								if(fmisc & hsGMatState::kMiscDrawMeshOutlines){ Log::Info() << "kMiscDrawMeshOutlines" << ", "; }
+								if(fmisc & hsGMatState::kMiscTwoSided){ Log::Info() << "kMiscTwoSided" << ", "; }
+								if(fmisc & hsGMatState::kMiscDrawAsSplats){ Log::Info() << "kMiscDrawAsSplats" << ", "; }
+								if(fmisc & hsGMatState::kMiscAdjustPlane){ Log::Info() << "kMiscAdjustPlane" << ", "; }
+								if(fmisc & hsGMatState::kMiscAdjustCylinder){ Log::Info() << "kMiscAdjustCylinder" << ", "; }
+								if(fmisc & hsGMatState::kMiscAdjustSphere){ Log::Info() << "kMiscAdjustSphere" << ", "; }
+								//if(fmisc & kMiscAdjust){ Log::Info() << "kMiscAdjust" << ", "; }
+								if(fmisc & hsGMatState::kMiscTroubledLoner){ Log::Info() << "kMiscTroubledLoner" << ", "; }
+								if(fmisc & hsGMatState::kMiscBindSkip){ Log::Info() << "kMiscBindSkip" << ", "; }
+								if(fmisc & hsGMatState::kMiscBindMask){ Log::Info() << "kMiscBindMask" << ", "; }
+								if(fmisc & hsGMatState::kMiscBindNext){ Log::Info() << "kMiscBindNext" << ", "; }
+								if(fmisc & hsGMatState::kMiscLightMap){ Log::Info() << "kMiscLightMap" << ", "; }
+								if(fmisc & hsGMatState::kMiscUseReflectionXform){ Log::Info() << "kMiscUseReflectionXform" << ", "; }
+								if(fmisc & hsGMatState::kMiscPerspProjection){ Log::Info() << "kMiscPerspProjection" << ", "; }
+								if(fmisc & hsGMatState::kMiscOrthoProjection){ Log::Info() << "kMiscOrthoProjection" << ", "; }
+								//if(fmisc & kMiscProjection){ Log::Info() << "kMiscProjection" << ", "; }
+								if(fmisc & hsGMatState::kMiscRestartPassHere){ Log::Info() << "kMiscRestartPassHere" << ", "; }
+								if(fmisc & hsGMatState::kMiscBumpLayer){ Log::Info() << "kMiscBumpLayer" << ", "; }
+								if(fmisc & hsGMatState::kMiscBumpDu){ Log::Info() << "kMiscBumpDu" << ", "; }
+								if(fmisc & hsGMatState::kMiscBumpDv){ Log::Info() << "kMiscBumpDv" << ", "; }
+								if(fmisc & hsGMatState::kMiscBumpDw){ Log::Info() << "kMiscBumpDw" << ", "; }
+								//if(fmisc & kMiscBumpChans){ Log::Info() << "kMiscBumpChans" << ", "; }
+								if(fmisc & hsGMatState::kMiscNoShadowAlpha){ Log::Info() << "kMiscNoShadowAlpha" << ", "; }
+								if(fmisc & hsGMatState::kMiscUseRefractionXform){ Log::Info() << "kMiscUseRefractionXform" << ", "; }
+								if(fmisc & hsGMatState::kMiscCam2Screen){ Log::Info() << "kMiscCam2Screen" << ", "; }
+								//if(fmisc & hsGMatState::kAllMiscFlags){ Log::Info() << "kAllMiscFlags" << ", "; }
+								Log::Info() << std::endl;
+								
+								Log::Info() << "\t\tShade: ";
+								if(fshade & hsGMatState::kShadeSoftShadow){ Log::Info() << "kShadeSoftShadow" << ", "; }
+								if(fshade & hsGMatState::kShadeNoProjectors){ Log::Info() << "kShadeNoProjectors" << ", "; }
+								if(fshade & hsGMatState::kShadeEnvironMap){ Log::Info() << "kShadeEnvironMap" << ", "; }
+								if(fshade & hsGMatState::kShadeVertexShade){ Log::Info() << "kShadeVertexShade" << ", "; }
+								if(fshade & hsGMatState::kShadeNoShade){ Log::Info() << "kShadeNoShade" << ", "; }
+								if(fshade & hsGMatState::kShadeBlack){ Log::Info() << "kShadeBlack" << ", "; }
+								if(fshade & hsGMatState::kShadeSpecular){ Log::Info() << "kShadeSpecular" << ", "; }
+								if(fshade & hsGMatState::kShadeNoFog){ Log::Info() << "kShadeNoFog" << ", "; }
+								if(fshade & hsGMatState::kShadeWhite){ Log::Info() << "kShadeWhite" << ", "; }
+								if(fshade & hsGMatState::kShadeSpecularAlpha){ Log::Info() << "kShadeSpecularAlpha" << ", "; }
+								if(fshade & hsGMatState::kShadeSpecularColor){ Log::Info() << "kShadeSpecularColor" << ", "; }
+								if(fshade & hsGMatState::kShadeSpecularHighlight){ Log::Info() << "kShadeSpecularHighlight" << ", "; }
+								if(fshade & hsGMatState::kShadeVertColShade){ Log::Info() << "kShadeVertColShade" << ", "; }
+								if(fshade & hsGMatState::kShadeInherit){ Log::Info() << "kShadeInherit" << ", "; }
+								if(fshade & hsGMatState::kShadeIgnoreVtxIllum){ Log::Info() << "kShadeIgnoreVtxIllum" << ", "; }
+								if(fshade & hsGMatState::kShadeEmissive){ Log::Info() << "kShadeEmissive" << ", "; }
+								if(fshade & hsGMatState::kShadeReallyNoFog){ Log::Info() << "kShadeReallyNoFog" << ", "; }
+								Log::Info() << std::endl;
+								
+								Log::Info() << "\t\tDepth: ";
+								if(fz & hsGMatState::kZIncLayer){ Log::Info() << "kZIncLayer" << ", "; }
+								if(fz & hsGMatState::kZClearZ){ Log::Info() << "kZClearZ" << ", "; }
+								if(fz & hsGMatState::kZNoZRead){ Log::Info() << "kZNoZRead" << ", "; }
+								if(fz & hsGMatState::kZNoZWrite){ Log::Info() << "kZNoZWrite" << ", "; }
+								//if(fz & kZMask){ Log::Info() << "kZMask" << ", "; }
+								if(fz & hsGMatState::kZLODBias){ Log::Info() << "kZLODBias" << ", "; }
+								Log::Info() << std::endl;
+								
+								if(lay->getVertexShader().Exists() && lay->getPixelShader().Exists()){
+									Log::Info() <<"\t\tShaders: " << lay->getVertexShader()->getName() << ", " << lay->getPixelShader()->getName() << std::endl;
+								}
+								if(lay->getUnderLay().Exists()){
+									Log::Info() <<"\t\tUnderlay: " << lay->getUnderLay()->getName() << std::endl;
+								}
+								
+							}
+							/*
+							LayerInterface* lay = plLayerInterface::Convert(mat->getLayers()[0]->getObj(), false);
 							if(lay->getTexture() != NULL){
 								textureName = lay->getTexture()->getName().to_std_string();
 							}
@@ -239,59 +378,19 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 									textureName = lay->getTexture()->getName().to_std_string();
 								}
 							}
-							const unsigned int uvwSrc = plLayerInterface::kUVWIdxMask & lay->getUVWSrc();
-							const hsMatrix44 uvwXform = lay->getTransform();
-							for (size_t j = 0; j < verts.size(); j++) {
-								hsVector3 txUvw = uvwXform.multPoint(verts[j].fUVWs[uvwSrc]);
-								// WARN: z will probably always be 0
-								meshUVs[j] = glm::vec2(txUvw.X, txUvw.Y);
-							}
+							*/
+							//const unsigned int uvwSrc = plLayerInterface::kUVWIdxMask & lay->getUVWSrc();
+							//const hsMatrix44 uvwXform = lay->getTransform();
+							
+						
+							Log::Info() << std::endl;
 						}
 					}
-						/*hsGMaterial* mat = hsGMaterial::Convert(matKey->getObj(), false);
-						if (mat == NULL || mat->getLayers().empty()) {
-							continue;
-						}
-						//Log::Info() << "Num uvs: " << span->getBuffer(ice->getGroupIdx())->getNumUVs() << std::endl;
-						//Log::Info() << "\t\t\tMaterial: " << mat->getKey()->getName();
-						//Log::Info() << ", " << mat->getLayers().size() << " layers. ";
-						//Log::Info() << "Compo: " << mat->getCompFlags() << ", piggyback: " << mat->getPiggyBacks().size() << std::endl;
-						
-						for(size_t lid = 0; lid < mat->getLayers().size(); ++lid){
-							plLayerInterface* lay = plLayerInterface::Convert(mat->getLayers()[lid]->getObj(), false);
-							//Log::Info() << "\t\t\t\t" << lay->getKey()->getName();
-							//Log::Info() << ", flags: " << lay->getState().fBlendFlags << " " << lay->getState().fClampFlags << " " <<  lay->getState().fShadeFlags << " " <<  lay->getState().fZFlags  << " " <<  lay->getState().fMiscFlags << ".";
-							if(lay->getTexture()){
-								//	Log::Info() << " Texture: " << lay->getTexture()->getName() << ", UV: " << lay->getUVWSrc();
-								
-								hasTexture = true;
-							}
-							//Log::Info() << std::endl;
-						}
-						
-						int ttid = 0;
-						plLayerInterface* lay = NULL;
-						do {
-							lay = plLayerInterface::Convert(mat->getLayers()[ttid]->getObj(), false);
-							++ttid;
-						} while(lay->getTexture() == NULL && ttid < mat->getLayers().size());
-						lay->getUnderLay()
-						// Find the first UVs used, for now.
-						// TODO: support multiple UV channels.
-						if(lay->getTexture()){
-							const unsigned int uvwSrc = plLayerInterface::kUVWIdxMask & lay->getUVWSrc();
-							const hsMatrix44 uvwXform = lay->getTransform();
-							textureName = lay->getTexture()->getName().to_std_string();
-							for (size_t j = 0; j < verts.size(); j++) {
-								hsVector3 txUvw = uvwXform.multPoint(verts[j].fUVWs[uvwSrc]);
-								// WARN: z will probably always be 0
-								meshUVs[j] = glm::vec2(txUvw.X, txUvw.Y);
-							}
-						}*/
 					
 					
-					const MeshInfos mesh = Resources::manager().registerMesh(fileName, meshIndices, meshPositions, meshNormals, meshUVs);
-					_objects.back().addSubObject(mesh, textureName);
+					
+					const MeshInfos mesh = Resources::manager().registerMesh(fileName, meshIndices, meshPositions, meshNormals, meshColors, meshUVs);
+					_objects.back().addSubObject(mesh, hsGMaterial::Convert(matKey->getObj(), false));
 				}
 			}
 		}
