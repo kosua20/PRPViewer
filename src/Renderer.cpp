@@ -68,8 +68,16 @@ void Renderer::draw(){
 		
 		ImGui::Checkbox("Show textures", &showTextures);
 		ImGui::SliderInt("Texture ID", &textureId, 0, _age->textures().size()-1);
+		if(showTextures){
+			const std::string txtStr = "Current: " + _age->textures()[textureId];
+			ImGui::Text("%s", txtStr.c_str());
+		}
 		ImGui::Checkbox("Show object", &showObject);
 		ImGui::SliderInt("Object ID", &objectId, 0, _age->objects().size()-1);
+		if(showObject){
+			const std::string txtStr = "Current: " + _age->objects()[objectId].getName();
+			ImGui::Text("%s", txtStr.c_str());
+		}
 	}
 	ImGui::End();
 	
@@ -135,6 +143,7 @@ void Renderer::defaultGLSetup(){
 	// Default GL setup.
 	glDisable(GL_DEPTH_TEST);
 	glEnable(GL_CULL_FACE);
+	glDepthFunc(GL_LEQUAL);
 	glFrontFace(GL_CCW);
 	glCullFace(GL_BACK);
 	glBlendEquation(GL_FUNC_ADD);

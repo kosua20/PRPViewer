@@ -6,11 +6,11 @@
 #include <PRP/Surface/hsGMaterial.h>
 #include <PRP/Surface/plLayer.h>
 
-Object::Object(const Type & type, std::shared_ptr<ProgramInfos> prog, const glm::mat4 &model) {
+Object::Object(const Type & type, std::shared_ptr<ProgramInfos> prog, const glm::mat4 &model, const std::string & name) {
 	_program = prog;
 	_type = type;
 	_model = glm::mat4(model);
-	
+	_name = name;
 }
 
 Object::~Object() {}

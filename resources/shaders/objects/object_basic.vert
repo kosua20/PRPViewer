@@ -11,16 +11,18 @@ layout(location = 6) in vec3 uv3;
 layout(location = 7) in vec3 uv4;
 layout(location = 8) in vec3 uv5;
 layout(location = 9) in vec3 uv6;
+layout(location = 10) in vec3 uv7;
 
 // Uniform: the MVP, MV and normal matrices
 uniform mat4 mvp;
 uniform mat3 normalMatrix;
+uniform int uvId = 0;
 
 // Output: tangent space matrix, position in view space and uv.
 out INTERFACE {
 	vec4 col;
 	vec3 pos;
-	vec2 uv;
+	vec3 uv;
 	vec3 n;
 } Out ;
 
@@ -30,6 +32,6 @@ void main(){
 	gl_Position = mvp * vec4(v, 1.0);
 	Out.col = col;
 	Out.pos = v;
-	Out.uv = uv0.xy;
+	Out.uv = (uvId == 0 ? uv0 : (uvId == 1 ? uv1 : (uvId == 2 ? uv2 : (uvId == 3 ? uv3 : (uvId == 4 ? uv4 : (uvId == 5 ? uv5 : (uvId == 6 ? uv6 : uv7 )))))));
 	Out.n = n;
 }

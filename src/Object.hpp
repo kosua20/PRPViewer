@@ -25,7 +25,7 @@ public:
 		hsGMaterial * material;
 	};
 	
-	Object(const Type & type, std::shared_ptr<ProgramInfos> prog, const glm::mat4 & model);
+	Object(const Type & type, std::shared_ptr<ProgramInfos> prog, const glm::mat4 & model, const std::string & name);
 
 	~Object();
 	
@@ -40,6 +40,7 @@ public:
 	/// Clean function
 	void clean() const;
 	
+	const std::string & getName() const { return _name; }
 
 private:
 	
@@ -49,6 +50,7 @@ private:
 	
 	Type _type;
 	glm::mat4 _model;
+	std::string _name;
 	
 };
 

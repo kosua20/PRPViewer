@@ -18,19 +18,28 @@ void resize_callback(GLFWwindow* window, int width, int height){
 }
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods){
-	Input::manager().keyPressedEvent(key, action);
+	if(!ImGui::GetIO().WantCaptureKeyboard){
+		Input::manager().keyPressedEvent(key, action);
+	}
 }
 
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods){
-	Input::manager().mousePressedEvent(button, action); // Could pass mods to simplify things.
+	if(!ImGui::GetIO().WantCaptureMouse){
+		Input::manager().mousePressedEvent(button, action); // Could pass mods to simplify things.
+	}
 }
 
 void cursor_pos_callback(GLFWwindow* window, double xpos, double ypos){
-	Input::manager().mouseMovedEvent(xpos, ypos);
+	if(!ImGui::GetIO().WantCaptureMouse){
+		Input::manager().mouseMovedEvent(xpos, ypos);
+	}
+	
 }
 
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset){
-	Input::manager().mouseScrolledEvent(xoffset, yoffset);
+	if(!ImGui::GetIO().WantCaptureMouse){
+		Input::manager().mouseScrolledEvent(xoffset, yoffset);
+	}
 }
 
 void joystick_callback(int joy, int event){

@@ -128,7 +128,7 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 			model = glm::rotate(glm::mat4(1.0f), -float(M_PI_2), glm::vec3(1.0f,0.0f,0.0f)) * model;
 			
 			//Log::Info() << objKey->getName() << std::endl;
-			_objects.emplace_back(type, Resources::manager().getProgram("object_basic"), model);
+			_objects.emplace_back(type, Resources::manager().getProgram("object_basic"), model, objKey->getName().to_std_string());
 			
 			for (size_t i = 0; i < draw->getNumDrawables(); ++i) {
 				if (draw->getDrawableKey(i) == -1){
