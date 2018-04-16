@@ -3,6 +3,7 @@
 #include "input/Input.hpp"
 #include "helpers/InterfaceUtilities.hpp"
 #include "helpers/Logger.hpp"
+#include <glm/gtx/norm.hpp>
 #include <stdio.h>
 #include <vector>
 
@@ -36,7 +37,9 @@ void Renderer::draw(){
 	static bool showTextures = false;
 	static int objectId = 0;
 	static bool showObject = false;
-	
+	static bool wireframe = false;
+	static float cullingDistance = 1500.0f;
+	static int drawCount = 0;
 	if (ImGui::Begin("Options")) {
 		static int current_item_id = 0;
 		
@@ -52,7 +55,8 @@ void Renderer::draw(){
 		}
 		const std::string nameStr = "Current: " + (_age ? _age->getName() : "None");
 		ImGui::Text("%s", nameStr.c_str());
-		
+		const std::string nameStr1 = "Draws: " + std::to_string(drawCount);
+		ImGui::Text("%s", nameStr1.c_str());
 		
 		auto linkingNameProvider = [](void* data, int idx, const char** out_text) {
 			const std::vector<std::string>* arr = (std::vector<std::string>*)data;
@@ -66,6 +70,9 @@ void Renderer::draw(){
 			
 		}
 		
+		
+		ImGui::Checkbox("Wireframe", &wireframe);
+		ImGui::SliderFloat("Culling dist.", &cullingDistance, 10.0f, 3000.0f);
 		ImGui::Checkbox("Show textures", &showTextures);
 		ImGui::SliderInt("Texture ID", &textureId, 0, _age->textures().size()-1);
 		if(showTextures){
@@ -75,7 +82,7 @@ void Renderer::draw(){
 		ImGui::Checkbox("Show object", &showObject);
 		ImGui::SliderInt("Object ID", &objectId, 0, _age->objects().size()-1);
 		if(showObject){
-			const std::string txtStr = "Current: " + _age->objects()[objectId].getName();
+			const std::string txtStr = "Current: " + _age->objects()[objectId]->getName();
 			ImGui::Text("%s", txtStr.c_str());
 		}
 	}
@@ -89,10 +96,26 @@ void Renderer::draw(){
 	glEnable(GL_DEPTH_TEST);
 	checkGLError();
 	if(showObject){
-		_age->objects()[objectId].draw(_camera.view() , _camera.projection());
+		const auto objectToShow = _age->objects()[objectId];
+		
+		if(wireframe){
+			objectToShow->drawDebug(_camera.view() , _camera.projection());
+		} else {
+			objectToShow->draw(_camera.view() , _camera.projection());
+		}
+		
 	} else {
+		drawCount = 0;
 		for(const auto & object : _age->objects()){
-			object.draw(_camera.view() , _camera.projection());
+			if(glm::length2(object->getCenter() - _camera.getPosition()) > cullingDistance*cullingDistance || !object->isVisible(_camera.getPosition(), _camera.getDirection())){
+				continue;
+			}
+			++drawCount;
+			if(wireframe){
+				object->drawDebug(_camera.view() , _camera.projection());
+			} else {
+				object->draw(_camera.view() , _camera.projection());
+			}
 		}
 	}
 	glDisable(GL_DEPTH_TEST);

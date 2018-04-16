@@ -71,7 +71,7 @@ Age::Age(const std::string & path){
 Age::~Age(){
 
 	for(const auto & obj : _objects){
-		obj.clean();
+		obj->clean();
 	}
 }
 
@@ -123,12 +123,18 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 				model[1][0] = localToWorld(0,1); model[1][1] = localToWorld(1,1); model[1][2] = localToWorld(2,1); model[1][3] = localToWorld(3,1);
 				model[2][0] = localToWorld(0,2); model[2][1] = localToWorld(1,2); model[2][2] = localToWorld(2,2); model[2][3] = localToWorld(3,2);
 				model[3][0] = localToWorld(0,3); model[3][1] = localToWorld(1,3); model[3][2] = localToWorld(2,3); model[3][3] = localToWorld(3,3);
+				
+				
 			}
 			// Swap axis.
 			model = glm::rotate(glm::mat4(1.0f), -float(M_PI_2), glm::vec3(1.0f,0.0f,0.0f)) * model;
 			
 			//Log::Info() << objKey->getName() << std::endl;
-			_objects.emplace_back(type, Resources::manager().getProgram("object_basic"), model, objKey->getName().to_std_string());
+			_objects.emplace_back(new Object(type, Resources::manager().getProgram("object_basic"), model, objKey->getName().to_std_string()));
+			
+			
+			
+			
 			
 			for (size_t i = 0; i < draw->getNumDrawables(); ++i) {
 				if (draw->getDrawableKey(i) == -1){
@@ -149,10 +155,21 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 
 					// Get the mesh internal representation.
 					plIcicle* ice = span->getIcicle(di.fIndices[id]);
-					
-					// if we have to bake the icicle specific position, use it.
 					const hsMatrix44 transfoMatrix = (bakePosition ? ice->getLocalToWorld() : hsMatrix44::Identity());
+					//Log::Info() << (ice->getWorldBounds().getMins()+ice->getWorldBounds().getMaxs())*0.5f << std::endl;
+					//Log::Info() << (ice->getWorldBounds().getCorner()) << std::endl;
+					// if we have to bake the icicle specific position, use it.
+					/*auto refbounds = ice->getWorldBounds();
+					refbounds.updateCenter();
 					
+					hsBounds3Ext bounds;
+					bounds.setType(hsBounds3Ext::kAxisAligned);
+					glm::vec4 resMax = model * glm::vec4(refbounds.getMaxs().X, refbounds.getMaxs().Y, refbounds.getMaxs().Z, 1.0f);
+					glm::vec4 resMin = model * glm::vec4(refbounds.getMins().X, refbounds.getMins().Y, refbounds.getMins().Z, 1.0f);
+					bounds.setMaxs(hsVector3(resMax.x, resMax.y, resMax.z));
+					bounds.setMins(hsVector3(resMin.x, resMin.y, resMin.z));
+					bounds.updateCenter();
+					Log::Info() << bounds.getCenter() << std::endl;*/
 					
 					std::vector<plGBufferVertex> verts = span->getVerts(ice);
 					std::vector<unsigned short> indices = span->getIndices(ice);
@@ -390,7 +407,7 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 					
 					
 					const MeshInfos mesh = Resources::manager().registerMesh(fileName, meshIndices, meshPositions, meshNormals, meshColors, meshUVs);
-					_objects.back().addSubObject(mesh, hsGMaterial::Convert(matKey->getObj(), false));
+					_objects.back()->addSubObject(mesh, hsGMaterial::Convert(matKey->getObj(), false));
 				}
 			}
 		}

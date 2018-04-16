@@ -31,12 +31,91 @@ struct TextureInfos {
 
 };
 
+
+
+struct BoundingBox {
+	glm::vec3 mins;
+	glm::vec3 maxs;
+	glm::vec3 center;
+	glm::vec3 c000, c001, c010, c011, c100, c101, c110, c111;
+	
+	BoundingBox(){
+		mins = glm::vec3(0.0f);
+		maxs = glm::vec3(0.0f);
+		updateValues();
+	}
+	
+	BoundingBox(const glm::vec3 minis, const glm::vec3 maxis){
+		mins = minis;
+		maxs = maxis;
+		updateValues();
+	}
+	
+	glm::vec3 getScale() const {
+		return (maxs - mins);
+	}
+	
+	void updateValues(){
+		center = 0.5f*(maxs+mins);
+		c000 = glm::vec3(mins.x, mins.y, mins.z);
+		c001 = glm::vec3(mins.x, mins.y, maxs.z);
+		c010 = glm::vec3(mins.x, maxs.y, mins.z);
+		c011 = glm::vec3(mins.x, maxs.y, maxs.z);
+		c100 = glm::vec3(maxs.x, mins.y, mins.z);
+		c101 = glm::vec3(maxs.x, mins.y, maxs.z);
+		c110 = glm::vec3(maxs.x, maxs.y, mins.z);
+		c111 = glm::vec3(maxs.x, maxs.y, maxs.z);
+	}
+	
+	BoundingBox transform(const glm::mat4 & transf){
+		const auto pmins = glm::vec3(transf * glm::vec4(mins, 1.0f));
+		const auto pmaxs = glm::vec3(transf * glm::vec4(maxs, 1.0f));
+		return BoundingBox(pmins, pmaxs);
+		
+	}
+	
+	bool contains(const glm::vec3 & point) const {
+		return point.x <= maxs.x && point.x >= mins.x
+		&& point.y <= maxs.y && point.y >= mins.y
+		&& point.z <= maxs.z && point.z >= mins.z;
+	}
+	
+	bool isVisible(const glm::vec3 & point, const glm::vec3 & dir) const {
+		return (glm::dot(c000 - point, dir) > 0.0f)
+			|| (glm::dot(c001 - point, dir) > 0.0f)
+			|| (glm::dot(c010 - point, dir) > 0.0f)
+			|| (glm::dot(c011 - point, dir) > 0.0f)
+			|| (glm::dot(c100 - point, dir) > 0.0f)
+			|| (glm::dot(c101 - point, dir) > 0.0f)
+			|| (glm::dot(c110 - point, dir) > 0.0f)
+		|| (glm::dot(c111 - point, dir) > 0.0f);
+	}
+	
+	bool isVisibleFast(const glm::vec3 & point, const glm::vec3 & dir) const {
+		return (glm::dot(mins - point, dir) > 0.0f || glm::dot(maxs - point, dir) > 0.0f);
+	}
+	
+	BoundingBox& operator +=(const BoundingBox & other){
+		mins = glm::min(mins, other.mins);
+		maxs = glm::max(maxs, other.maxs);
+		return *this;
+	}
+	
+	BoundingBox& operator +=(const glm::vec3 & other){
+		mins = glm::min(mins, other);
+		maxs = glm::max(maxs, other);
+		return *this;
+	}
+};
+
 struct MeshInfos {
 	GLuint vId;
 	GLuint eId;
 	GLsizei count;
 	size_t uvCount;
-	MeshInfos() : vId(0), eId(0), count(0) {}
+	BoundingBox bbox;
+	
+	MeshInfos() : vId(0), eId(0), count(0), uvCount(0), bbox(glm::vec3(0.0f), glm::vec3(0.0f)) {}
 
 };
 

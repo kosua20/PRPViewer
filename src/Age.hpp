@@ -19,7 +19,7 @@ public:
 		return _name;
 	}
 	
-	const std::vector<Object> & objects(){
+	const std::vector<std::shared_ptr<Object>> & objects(){
 		return _objects;
 	}
 	
@@ -42,7 +42,7 @@ private:
 	
 	std::string _name;
 	std::shared_ptr<plResManager> _rm;
-	std::vector<Object> _objects;
+	std::vector<std::shared_ptr<Object>> _objects;
 	std::vector<std::string> _textures;
 	std::map<std::string, glm::vec3> _linkingPoints;
 	std::vector<std::string> _linkingNamesCache;

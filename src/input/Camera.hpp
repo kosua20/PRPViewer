@@ -42,6 +42,10 @@ public:
 	
 	void setCenter(const glm::vec3 & newCenter);
 	
+	const glm::vec3 & getPosition() const { return _eye; }
+	
+	const glm::vec3 getDirection() const { return _center - _eye;  } // Dont care about normalization for now.
+	
 private:
 	
 	void updateUsingJoystick(double frameTime);

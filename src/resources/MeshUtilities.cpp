@@ -213,6 +213,7 @@ void MeshUtilities::centerAndUnitMesh(Mesh & mesh){
 }
 
 void MeshUtilities::computeTangentsAndBinormals(Mesh & mesh){
+	return;
 	if(mesh.indices.size() * mesh.positions.size() * mesh.texcoords.size() == 0){
 		// Missing data, or not the right mode (Points).
 		return;

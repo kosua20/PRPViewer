@@ -246,6 +246,14 @@ const MeshInfos Resources::registerMesh(const std::string & name, const std::vec
 	//MeshUtilities::centerAndUnitMesh(mesh);
 	infos = GLUtilities::setupBuffers(mesh);
 	
+	if(!positions.empty()){
+		infos.bbox = BoundingBox(positions[0], positions[0]);
+		for(const auto & pos : positions){
+			infos.bbox += pos;
+		}
+		infos.bbox.updateValues();
+	}
+	
 	_meshes[name] = infos;
 	return infos;
 }

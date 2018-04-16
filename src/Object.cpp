@@ -17,15 +17,76 @@ Object::~Object() {}
 
 
 void Object::addSubObject(const MeshInfos & infos, hsGMaterial * material){
+	if(_subObjects.empty()){
+		_localBounds = infos.bbox;
+	} else {
+		_localBounds += infos.bbox;
+	}
 	_subObjects.push_back({infos, material});
+	
+	_localBounds.updateValues();
+	_globalBounds = _localBounds.transform(_model);
 }
 
 void Object::update(const glm::mat4& model) {
-
-	//_model = model;
+	_model = model;
+	_globalBounds = _localBounds.transform(_model);
 
 }
 
+const bool Object::isVisible(const glm::vec3 & point, const glm::vec3 & dir) const {
+	return _globalBounds.contains(point) || _globalBounds.isVisible(point, dir);
+}
+
+void Object::drawDebug(const glm::mat4& view, const glm::mat4& projection) const {
+	
+	//Log::Info() << _bounds.getCenter() << std::endl;
+	glm::mat4 MV = view * _model;
+	if(_type == Billboard || _type == BillboardY){
+		glm::mat4 viewCopy = glm::transpose(glm::mat4(glm::mat3(view)));
+		if(_type == BillboardY){
+			viewCopy[1][0] = 0.0;
+			viewCopy[1][1] = 1.0;
+			viewCopy[1][2] = 0.0;
+		}
+		MV = view * glm::translate(glm::mat4(1.0f), glm::vec3(_model[3][0],_model[3][1],_model[3][2])) * viewCopy  * glm::scale(glm::mat4(1.0f), glm::vec3(_model[0][0]));
+	}
+	const glm::mat4 MVP = projection * MV;
+	const auto debugProgram = Resources::manager().getProgram("wireframe");
+	glDisable(GL_BLEND);
+	glEnable(GL_DEPTH_TEST);
+	glDisable(GL_CULL_FACE);
+	glUseProgram(debugProgram->id());
+	
+	glUniformMatrix4fv(debugProgram->uniform("mvp"), 1, GL_FALSE, &MVP[0][0]);
+	glUniform3f(debugProgram->uniform("color"), 0.0f,0.0f,0.0f);
+	
+	glPolygonMode ( GL_FRONT_AND_BACK, GL_LINE );
+	for(const auto & subObject : _subObjects){
+		glBindVertexArray(subObject.mesh.vId);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, subObject.mesh.eId);
+		glDrawElements(GL_TRIANGLES, subObject.mesh.count, GL_UNSIGNED_INT, (void*)0);
+	}
+	
+	if(_type != Billboard && _type != BillboardY){
+		
+		const auto center = _globalBounds.center;
+		const auto scale = _globalBounds.getScale()*0.5f;
+		glm::mat4 iden = glm::scale(glm::translate(glm::mat4(1.0f), center), scale);
+		iden = projection * view * iden;
+		glUniformMatrix4fv(debugProgram->uniform("mvp"), 1, GL_FALSE, &iden[0][0]);
+		glUniform3f(debugProgram->uniform("color"), 1.0f,0.0f,0.0f);
+		const auto boxMesh = Resources::manager().getMesh("box");
+		glBindVertexArray(boxMesh.vId);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, boxMesh.eId);
+		glDrawElements(GL_TRIANGLES, boxMesh.count, GL_UNSIGNED_INT, (void*)0);
+		
+	}
+	glPolygonMode ( GL_FRONT_AND_BACK, GL_FILL );
+	glBindVertexArray(0);
+	glUseProgram(0);
+	glEnable(GL_CULL_FACE);
+}
 
 void Object::draw(const glm::mat4& view, const glm::mat4& projection) const {
 

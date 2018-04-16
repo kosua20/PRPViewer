@@ -2,6 +2,9 @@
 #define Object_h
 #include "resources/ResourcesManager.hpp"
 
+
+#include <PRP/Region/hsBounds.h>
+
 #include <gl3w/gl3w.h>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
@@ -35,6 +38,8 @@ public:
 	void update(const glm::mat4& model);
 	
 	/// Draw function
+	void drawDebug(const glm::mat4& view, const glm::mat4& projection) const;
+	
 	void draw(const glm::mat4& view, const glm::mat4& projection) const;
 	
 	/// Clean function
@@ -42,6 +47,10 @@ public:
 	
 	const std::string & getName() const { return _name; }
 
+	const glm::vec3 & getCenter() const { return _globalBounds.center; }
+	
+	const bool isVisible(const glm::vec3 & point, const glm::vec3 & dir) const;
+	
 private:
 	
 	std::shared_ptr<ProgramInfos> _program;
@@ -51,7 +60,8 @@ private:
 	Type _type;
 	glm::mat4 _model;
 	std::string _name;
-	
+	BoundingBox _localBounds;
+	BoundingBox _globalBounds;
 };
 
 #endif
