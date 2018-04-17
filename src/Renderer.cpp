@@ -105,6 +105,7 @@ void Renderer::draw(){
 		}
 		
 	} else {
+		//const glm::mat4 viewproj = _camera.projection() * _camera.view();
 		drawCount = 0;
 		for(const auto & object : _age->objects()){
 			if(glm::length2(object->getCenter() - _camera.getPosition()) > cullingDistance*cullingDistance || !object->isVisible(_camera.getPosition(), _camera.getDirection())){

@@ -31,6 +31,12 @@ struct TextureInfos {
 
 };
 
+static const bool isInFrustum(const glm::vec3 & point, const glm::mat4 & viewproj)  {
+	const auto homCoords = viewproj * glm::vec4(point, 1.0f);
+	const glm::vec3 clipCoords = glm::vec3(homCoords)/homCoords.w;
+	return (std::abs(clipCoords.x) <= 1.0f) && (std::abs(clipCoords.y) <= 1.0f) && (std::abs(clipCoords.z) <= 1.0f);
+}
+
 
 
 struct BoundingBox {
@@ -68,8 +74,18 @@ struct BoundingBox {
 	}
 	
 	BoundingBox transform(const glm::mat4 & transf){
-		const auto pmins = glm::vec3(transf * glm::vec4(mins, 1.0f));
-		const auto pmaxs = glm::vec3(transf * glm::vec4(maxs, 1.0f));
+		const auto tc000 = glm::vec3(transf * glm::vec4(c000, 1.0f));
+		const auto tc001 = glm::vec3(transf * glm::vec4(c001, 1.0f));
+		const auto tc010 = glm::vec3(transf * glm::vec4(c010, 1.0f));
+		const auto tc011 = glm::vec3(transf * glm::vec4(c011, 1.0f));
+		const auto tc100 = glm::vec3(transf * glm::vec4(c100, 1.0f));
+		const auto tc101 = glm::vec3(transf * glm::vec4(c101, 1.0f));
+		const auto tc110 = glm::vec3(transf * glm::vec4(c110, 1.0f));
+		const auto tc111 = glm::vec3(transf * glm::vec4(c111, 1.0f));
+		const auto pmins = glm::min(glm::min(glm::min(tc000, tc001), glm::min(tc010, tc011)),
+									glm::min(glm::min(tc100, tc101), glm::min(tc110, tc111)));
+		const auto pmaxs = glm::max(glm::max(glm::max(tc000, tc001), glm::max(tc010, tc011)),
+									glm::max(glm::max(tc100, tc101), glm::max(tc110, tc111)));
 		return BoundingBox(pmins, pmaxs);
 		
 	}
@@ -78,6 +94,18 @@ struct BoundingBox {
 		return point.x <= maxs.x && point.x >= mins.x
 		&& point.y <= maxs.y && point.y >= mins.y
 		&& point.z <= maxs.z && point.z >= mins.z;
+	}
+	
+	bool intersectsFrustum(const glm::mat4 & viewproj) const {
+		// TODO: improve support for covering/side-to-side intersections.
+		return isInFrustum(c000, viewproj)
+			|| isInFrustum(c001, viewproj)
+			|| isInFrustum(c010, viewproj)
+			|| isInFrustum(c011, viewproj)
+			|| isInFrustum(c100, viewproj)
+			|| isInFrustum(c101, viewproj)
+			|| isInFrustum(c110, viewproj)
+			|| isInFrustum(c111, viewproj);
 	}
 	
 	bool isVisible(const glm::vec3 & point, const glm::vec3 & dir) const {

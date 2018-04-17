@@ -51,6 +51,10 @@ public:
 	
 	const bool isVisible(const glm::vec3 & point, const glm::vec3 & dir) const;
 	
+	const bool isVisible(const glm::vec3 & point, const glm::mat4 & viewproj) const;
+	
+	
+	
 private:
 	
 	std::shared_ptr<ProgramInfos> _program;

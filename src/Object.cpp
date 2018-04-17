@@ -31,7 +31,10 @@ void Object::addSubObject(const MeshInfos & infos, hsGMaterial * material){
 void Object::update(const glm::mat4& model) {
 	_model = model;
 	_globalBounds = _localBounds.transform(_model);
+}
 
+const bool Object::isVisible(const glm::vec3 & point, const glm::mat4 & viewproj) const {
+	return _globalBounds.contains(point) || _globalBounds.intersectsFrustum(viewproj);
 }
 
 const bool Object::isVisible(const glm::vec3 & point, const glm::vec3 & dir) const {
