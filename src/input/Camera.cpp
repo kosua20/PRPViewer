@@ -11,7 +11,7 @@
 
 Camera::Camera()  {
 	//_verticalResolution = 720;
-	_speed = 7.0f;
+	_speed = 12.0f;
 	_angularSpeed = 5.0f;
 	_fov = 1.91f;
 	_ratio = 4.0f/3.0f;
@@ -58,7 +58,7 @@ void Camera::update(){
 		_speed = std::max(_speed, 0.0f);
 	}
 	
-	if (ImGui::Begin("Options")) {
+	if (ImGui::Begin("Infos")) {
 		ImGui::Text("Speed: %.1f", _speed);
 	}
 	ImGui::End();

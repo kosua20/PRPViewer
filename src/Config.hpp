@@ -29,14 +29,14 @@ public:
 	
 	bool logVerbose = false;
 	
-	unsigned int initialWidth = 800;
+	unsigned int initialWidth = 1080;
 	
-	unsigned int initialHeight = 600;
+	unsigned int initialHeight = 720;
 	
 	float internalVerticalResolution = 720.0f;
 	
 	/// Computed properties.
-	glm::vec2 screenResolution = glm::vec2(800.0,600.0);
+	glm::vec2 screenResolution = glm::vec2(1080,720);
 	
 	float screenDensity = 1.0f;
 	

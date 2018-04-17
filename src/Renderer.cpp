@@ -38,9 +38,26 @@ void Renderer::draw(){
 	static int objectId = 0;
 	static bool showObject = false;
 	static bool wireframe = false;
+	static bool doCulling = true;
 	static float cullingDistance = 1500.0f;
 	static int drawCount = 0;
-	if (ImGui::Begin("Options")) {
+	if (ImGui::Begin("Infos")) {
+		const std::string nameStr = "Age: " + (_age ? _age->getName() : "None");
+		ImGui::Text("%s", nameStr.c_str());
+		const std::string nameStr1 = "Draws: " + std::to_string(drawCount) + "/" + std::to_string(_age->objects().size());
+		ImGui::Text("%s", nameStr1.c_str());
+		if(showTextures){
+			const std::string txtStr = "Current: " + _age->textures()[textureId];
+			ImGui::Text("%s", txtStr.c_str());
+		}
+		if(showObject){
+			const std::string txtStr = "Current: " + _age->objects()[objectId]->getName();
+			ImGui::Text("%s", txtStr.c_str());
+		}
+	}
+	ImGui::End();
+	
+	if (ImGui::Begin("Settings")) {
 		static int current_item_id = 0;
 		
 		if(ImGui::Button("Load .age file...")){
@@ -53,10 +70,7 @@ void Renderer::draw(){
 			textureId = 0;
 			showTextures = false;
 		}
-		const std::string nameStr = "Current: " + (_age ? _age->getName() : "None");
-		ImGui::Text("%s", nameStr.c_str());
-		const std::string nameStr1 = "Draws: " + std::to_string(drawCount);
-		ImGui::Text("%s", nameStr1.c_str());
+		
 		
 		auto linkingNameProvider = [](void* data, int idx, const char** out_text) {
 			const std::vector<std::string>* arr = (std::vector<std::string>*)data;
@@ -72,19 +86,14 @@ void Renderer::draw(){
 		
 		
 		ImGui::Checkbox("Wireframe", &wireframe);
+		ImGui::Checkbox("Culling", &doCulling);
 		ImGui::SliderFloat("Culling dist.", &cullingDistance, 10.0f, 3000.0f);
 		ImGui::Checkbox("Show textures", &showTextures);
 		ImGui::SliderInt("Texture ID", &textureId, 0, _age->textures().size()-1);
-		if(showTextures){
-			const std::string txtStr = "Current: " + _age->textures()[textureId];
-			ImGui::Text("%s", txtStr.c_str());
-		}
+		
 		ImGui::Checkbox("Show object", &showObject);
 		ImGui::SliderInt("Object ID", &objectId, 0, _age->objects().size()-1);
-		if(showObject){
-			const std::string txtStr = "Current: " + _age->objects()[objectId]->getName();
-			ImGui::Text("%s", txtStr.c_str());
-		}
+		
 	}
 	ImGui::End();
 	
@@ -108,7 +117,10 @@ void Renderer::draw(){
 		//const glm::mat4 viewproj = _camera.projection() * _camera.view();
 		drawCount = 0;
 		for(const auto & object : _age->objects()){
-			if(glm::length2(object->getCenter() - _camera.getPosition()) > cullingDistance*cullingDistance || !object->isVisible(_camera.getPosition(), _camera.getDirection())){
+			if(doCulling &&
+			   (glm::length2(object->getCenter() - _camera.getPosition()) > cullingDistance*cullingDistance
+				|| !object->isVisible(_camera.getPosition(), _camera.getDirection())
+				)){
 				continue;
 			}
 			++drawCount;
