@@ -42,17 +42,15 @@ void Renderer::draw(){
 	static float cullingDistance = 1500.0f;
 	static int drawCount = 0;
 	if (ImGui::Begin("Infos")) {
-		const std::string nameStr = "Age: " + (_age ? _age->getName() : "None");
-		ImGui::Text("%s", nameStr.c_str());
-		const std::string nameStr1 = "Draws: " + std::to_string(drawCount) + "/" + std::to_string(_age->objects().size());
-		ImGui::Text("%s", nameStr1.c_str());
+		
+		ImGui::Text("%2.1f FPS (%2.1f ms)", ImGui::GetIO().Framerate, ImGui::GetIO().DeltaTime*1000.0f);
+		ImGui::Text("Age: %s", (_age ? _age->getName().c_str() : "None"));
+		ImGui::Text("Draws: %i/%lu", drawCount, _age->objects().size());
 		if(showTextures){
-			const std::string txtStr = "Current: " + _age->textures()[textureId];
-			ImGui::Text("%s", txtStr.c_str());
+			ImGui::Text("Current: %s", _age->textures()[textureId].c_str());
 		}
 		if(showObject){
-			const std::string txtStr = "Current: " + _age->objects()[objectId]->getName();
-			ImGui::Text("%s", txtStr.c_str());
+			ImGui::Text("Current: %s", _age->objects()[objectId]->getName().c_str());
 		}
 	}
 	ImGui::End();
@@ -96,6 +94,7 @@ void Renderer::draw(){
 		
 	}
 	ImGui::End();
+	Log::Info().display();
 	
 	if(showTextures){
 		_quad.draw(Resources::manager().getTexture(_age->textures()[textureId]).id);

@@ -45,6 +45,8 @@ public:
 	
 	void setVerbose(const bool verbose);
 	
+	void display();
+	
 	template<class T>
 	Log & operator<<(const T& input){
 		appendIfNeeded();
@@ -101,6 +103,7 @@ private:
 	bool _logToStdin;
 	std::ofstream _file;
 	std::stringstream _stream;
+	std::string _fullLog;
 	bool _verbose;
 	bool _ignoreUntilFlush;
 	bool _appendPrefix;

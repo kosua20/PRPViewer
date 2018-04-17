@@ -1,8 +1,8 @@
 #include "Logger.hpp"
+#include <imgui/imgui.h>
 #include <ctime>
 #include <iomanip>
 #include <iostream>
-
 // We statically initialize the default logger.
 // We don't really care about its exact construction/destruction moments,
 // but we want it to always be created.
@@ -92,12 +92,29 @@ void Log::flush(){
 		if(_file.is_open()){
 			_file << finalStr << std::flush;
 		}
+		
+		_fullLog.append(finalStr);
 	}
 	_ignoreUntilFlush = false;
 	_appendPrefix = false;
 	_stream.str(std::string());
 	_stream.clear();
 	_level = LogLevel::INFO;
+}
+
+void Log::display(){
+	if(ImGui::Begin("Log")){
+		if(ImGui::Button("Clear")){ _fullLog = ""; }
+		ImGui::SameLine();
+		const bool shouldCopy = ImGui::Button("Copy");
+		ImGui::Separator();
+		ImGui::BeginChild("scrolling", ImVec2(0,0), false, ImGuiWindowFlags_HorizontalScrollbar);
+		if(shouldCopy){ ImGui::LogToClipboard(); }
+		ImGui::TextUnformatted(_fullLog.c_str());
+		ImGui::SetScrollHere(1.0f);
+		ImGui::EndChild();
+	}
+	ImGui::End();
 }
 
 void Log::appendIfNeeded(){

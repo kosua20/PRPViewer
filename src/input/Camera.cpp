@@ -10,7 +10,6 @@
 #endif
 
 Camera::Camera()  {
-	//_verticalResolution = 720;
 	_speed = 12.0f;
 	_angularSpeed = 5.0f;
 	_fov = 1.91f;
