@@ -37,7 +37,13 @@ static const bool isInFrustum(const glm::vec3 & point, const glm::mat4 & viewpro
 	return (std::abs(clipCoords.x) <= 1.0f) && (std::abs(clipCoords.y) <= 1.0f) && (std::abs(clipCoords.z) <= 1.0f);
 }
 
-
+static const unsigned char getQuadrant(const glm::vec3 & point, const glm::mat4 & viewproj)  {
+	const auto homCoords = viewproj * glm::vec4(point, 1.0f);
+	const glm::vec3 cCoords = glm::vec3(homCoords)/homCoords.w;
+	return ((cCoords.x > 1.0f) << 3) | ((cCoords.x < -1.0f) << 2)
+		 | ((cCoords.z > 1.0f) << 5) | ((cCoords.x < -1.0f) << 4)
+		 | ((cCoords.y > 1.0f) << 1) | (cCoords.y < -1.0f);
+}
 
 struct BoundingBox {
 	glm::vec3 mins;
@@ -98,14 +104,20 @@ struct BoundingBox {
 	
 	bool intersectsFrustum(const glm::mat4 & viewproj) const {
 		// TODO: improve support for covering/side-to-side intersections.
-		return isInFrustum(c000, viewproj)
-			|| isInFrustum(c001, viewproj)
-			|| isInFrustum(c010, viewproj)
-			|| isInFrustum(c011, viewproj)
-			|| isInFrustum(c100, viewproj)
-			|| isInFrustum(c101, viewproj)
-			|| isInFrustum(c110, viewproj)
-			|| isInFrustum(c111, viewproj);
+		const unsigned char f000 = getQuadrant(c000, viewproj);
+		const unsigned char f001 = getQuadrant(c001, viewproj);
+		const unsigned char f010 = getQuadrant(c010, viewproj);
+		const unsigned char f011 = getQuadrant(c011, viewproj);
+		const unsigned char f100 = getQuadrant(c100, viewproj);
+		const unsigned char f101 = getQuadrant(c101, viewproj);
+		const unsigned char f110 = getQuadrant(c110, viewproj);
+		const unsigned char f111 = getQuadrant(c111, viewproj);
+		
+		const unsigned char fall = f000 & f001 & f010 & f011 & f100 & f101 & f110 & f111;
+		if(fall != 0){
+			return false;
+		}
+		return true;
 	}
 	
 	bool isVisible(const glm::vec3 & point, const glm::vec3 & dir) const {

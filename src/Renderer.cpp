@@ -20,12 +20,17 @@ Renderer::Renderer(Config & config) : _config(config) {
 	_quad.init("passthrough");
 	// Setup camera parameters.
 	_camera.projection(config.screenResolution[0]/config.screenResolution[1], 1.3f, 0.1f, 8000.0f);
-	Resources::manager().getProgram("object_basic")->registerTexture("texture0", 0);
-	Resources::manager().getProgram("object_basic")->registerTexture("cubemap1", 1);
-
+	for(int i = 0; i < 8; ++i){
+		Resources::manager().getProgram("object_basic")->registerTexture("textures["+std::to_string(i)+"]", i);
+		Resources::manager().getProgram("object_basic")->registerTexture("cubemaps["+std::to_string(i)+"]", 8+i);
+	}
+	
+	std::vector<std::string> files = ImGui::listFiles("../../../data/mystv/", false, false, {"age"});
 	
 	loadAge("../../../data/uru/spyroom.age");
 }
+
+
 
 void Renderer::draw(){
 	glViewport(0, 0, GLsizei(_config.screenResolution[0]), GLsizei(_config.screenResolution[1]));
@@ -113,12 +118,25 @@ void Renderer::draw(){
 		}
 		
 	} else {
-		//const glm::mat4 viewproj = _camera.projection() * _camera.view();
+		const glm::mat4 viewproj = _camera.projection() * _camera.view();
 		drawCount = 0;
-		for(const auto & object : _age->objects()){
+		auto objects = _age->objectsClone();
+		/*auto& camera = _camera;
+		std::sort(objects.begin(), objects.end(), [&camera](const std::shared_ptr<Object> & leftObj, const std::shared_ptr<Object> & rightObj){
+			
+			// Compute both distances to camera.
+			const float leftDist = glm::length2(leftObj->getCenter() - camera.getPosition());
+			const float rightDist = glm::length2(rightObj->getCenter() - camera.getPosition());
+			// We want to first render objects further away from the camera.
+			return leftDist > rightDist;
+			
+		});*/
+		
+		for(const auto & object : objects){
 			if(doCulling &&
-			   (glm::length2(object->getCenter() - _camera.getPosition()) > cullingDistance*cullingDistance
-				|| !object->isVisible(_camera.getPosition(), _camera.getDirection())
+			   (glm::length2(object->getCenter() - _camera.getPosition()) > cullingDistance*cullingDistance ||
+				// !object->isVisible(_camera.getPosition(), _camera.getDirection()) || (
+				 !object->isVisible(_camera.getPosition(), viewproj)
 				)){
 				continue;
 			}
@@ -141,6 +159,7 @@ void Renderer::loadAge(const std::string & path){
 	_age.reset(new Age(path));
 	// A Uru human is around 4/5 units in height apparently.
 	_camera.setCenter(_age->getDefaultLinkingPoint());
+	//_maxLayer = std::max(_maxLayer, _age->maxLayer());
 }
 void Renderer::update(){
 	if(Input::manager().resized()){
