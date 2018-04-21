@@ -104,6 +104,7 @@ void Log::flush(){
 
 void Log::display(){
 	if(ImGui::Begin("Log")){
+		static bool setScroll = true;
 		if(ImGui::Button("Clear")){ _fullLog = ""; }
 		ImGui::SameLine();
 		const bool shouldCopy = ImGui::Button("Copy");
@@ -111,7 +112,7 @@ void Log::display(){
 		ImGui::BeginChild("scrolling", ImVec2(0,0), false, ImGuiWindowFlags_HorizontalScrollbar);
 		if(shouldCopy){ ImGui::LogToClipboard(); }
 		ImGui::TextUnformatted(_fullLog.c_str());
-		ImGui::SetScrollHere(1.0f);
+		if(setScroll){ImGui::SetScrollHere(1.0f); setScroll = false;}
 		ImGui::EndChild();
 	}
 	ImGui::End();

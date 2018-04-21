@@ -4,6 +4,7 @@
 #include "Age.hpp"
 #include "input/Camera.hpp"
 #include "ScreenQuad.hpp"
+#include "Object.hpp"
 #include <gl3w/gl3w.h>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
@@ -48,6 +49,8 @@ private:
 	
 	void defaultGLSetup();
 	void loadAge(const std::string & path);
+	
+	//size_t _maxLayer = 0;
 };
 
 #endif

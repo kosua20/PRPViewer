@@ -31,12 +31,12 @@ public:
 	
 	unsigned int initialWidth = 1080;
 	
-	unsigned int initialHeight = 720;
+	unsigned int initialHeight = 800;
 	
 	float internalVerticalResolution = 720.0f;
 	
 	/// Computed properties.
-	glm::vec2 screenResolution = glm::vec2(1080,720);
+	glm::vec2 screenResolution = glm::vec2(1080,800);
 	
 	float screenDensity = 1.0f;
 	

@@ -23,6 +23,10 @@ public:
 		return _objects;
 	}
 	
+	std::vector<std::shared_ptr<Object>> objectsClone(){
+		return _objects;
+	}
+	
 	const std::vector<std::string> & textures(){
 		return _textures;
 	}
@@ -36,6 +40,11 @@ public:
 		return _linkingNamesCache;
 	}
 	
+	const size_t maxLayer(){
+		return _maxLayer;
+	
+	}
+	
 private:
 	
 	void loadMeshes( plResManager & rm, const plLocation& ploc);
@@ -47,7 +56,7 @@ private:
 	std::map<std::string, glm::vec3> _linkingPoints;
 	std::vector<std::string> _linkingNamesCache;
 	
-	
+	size_t _maxLayer = 0;
 };
 
 #endif

@@ -74,12 +74,18 @@ Age::~Age(){
 		obj->clean();
 	}
 }
+unsigned char reverse(unsigned char b) {
+	b = (b & 0xF0) >> 4 | (b & 0x0F) << 4;
+	b = (b & 0xCC) >> 2 | (b & 0x33) << 2;
+	b = (b & 0xAA) >> 1 | (b & 0x55) << 1;
+	return b;
+}
 
 void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 	plSceneNode* scene = rm.getSceneNode(ploc);
 	
 	if(scene){
-		
+		int i = 0;
 		for(const auto & objKey : scene->getSceneObjects()){
 			
 			plSceneObject* obj = plSceneObject::Convert(rm.getObject(objKey));
@@ -128,13 +134,16 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 			}
 			// Swap axis.
 			model = glm::rotate(glm::mat4(1.0f), -float(M_PI_2), glm::vec3(1.0f,0.0f,0.0f)) * model;
-			
+//			++i;
+//			if(i<74){
+//				continue;
+//			}
 			//Log::Info() << objKey->getName() << std::endl;
 			_objects.emplace_back(new Object(type, Resources::manager().getProgram("object_basic"), model, objKey->getName().to_std_string()));
 			
 			
 			
-			
+			Log::Info() << objKey->getName() << std::endl;
 			
 			for (size_t i = 0; i < draw->getNumDrawables(); ++i) {
 				if (draw->getDrawableKey(i) == -1){
@@ -174,7 +183,7 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 					std::vector<plGBufferVertex> verts = span->getVerts(ice);
 					std::vector<unsigned short> indices = span->getIndices(ice);
 					const unsigned int uvCount = span->getBuffer(ice->getGroupIdx())->getNumUVs();
-					
+					Log::Info() << "UV Count" << uvCount << std::endl;
 					std::vector<unsigned int> meshIndices(indices.size());
 					std::vector<glm::vec3> meshPositions(verts.size());
 					std::vector<glm::vec3> meshNormals(verts.size());
@@ -192,7 +201,13 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 						meshPositions[j] = glm::vec3(pos.X, pos.Y, pos.Z);
 						meshNormals[j] = glm::vec3(fnorm.X, fnorm.Y, fnorm.Z);
 						const unsigned int color = verts[j].fColor;
-						meshColors[j] = glm::u8vec4(int((color >> 16) & 0xFF), int((color >> 8) & 0xFF) , int(color & 0xFF), int((color >> 24) & 0xFF));
+						unsigned char red = char((color >> 16) & 0xFF);
+						unsigned char gre = char((color >> 8) & 0xFF);
+						unsigned char blu = char((color) & 0xFF);
+						unsigned char alp = char((color >> 24) & 0xFF);
+						meshColors[j] = glm::u8vec4(red, gre, blu, alp);
+						//Log::Info() << std::bitset<32>(color) << ", ";
+						
 						for(size_t uvid = 0; uvid < uvCount; ++uvid){
 							const hsVector3 uvCoords = verts[j].fUVWs[uvid];
 							meshUVs[uvid][j] = glm::vec3(uvCoords.X, uvCoords.Y, uvCoords.Z);
@@ -200,14 +215,16 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 						}
 					}
 					
-					
+					Log::Info() << std::endl;
 					
 					
 					plKey matKey = span->getMaterials()[ice->getMaterialIdx()];
 					
 					std::string textureName = "";
-					Log::Info() << objKey->getName() << ", UV Count" << uvCount << std::endl;
-					const unsigned int iceflags = ice->getProps();
+					
+					const unsigned int iceflags = span->getProps();//ice->getProps();
+					
+					if(iceflags!=0){
 					Log::Info() << "Span flags: ";
 					if(iceflags & plSpan::kLiteMaterial){ Log::Info() << "kLiteMaterial" << ", "; }
 					if(iceflags & plSpan::kPropNoDraw){ Log::Info() << "kPropNoDraw" << ", "; }
@@ -234,14 +251,16 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 					if(iceflags & plSpan::kPartialSort){ Log::Info() << "kPartialSort" << ", "; }
 					if(iceflags & plSpan::kVisLOS){ Log::Info() << "kVisLOS" << ", "; }
 					Log::Info() << std::endl;
+					}
 					
 					if (matKey.Exists()) {
 					
 						hsGMaterial* mat = hsGMaterial::Convert(matKey->getObj(), false);
 						if (mat != NULL && mat->getLayers().size() > 0) {
-							
+							_maxLayer = std::max(_maxLayer, mat->getLayers().size()-1);
 							Log::Info() << "Material " << mat->getKey()->getName() << std::endl;
 							const unsigned int cflags = mat->getCompFlags();
+							if(cflags!=0){
 							Log::Info() << "\tCompflags: ";
 							if(cflags & hsGMaterial::kCompShaded){ Log::Info() << "kCompShaded" << ", ";}
 							if(cflags & hsGMaterial::kCompEnvironMap){ Log::Info() << "kCompEnvironMap" << ", ";}
@@ -258,13 +277,16 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 							if(cflags & hsGMaterial::kCompIsLightMapped){ Log::Info() << "kCompIsLightMapped" << ", ";}
 							if(cflags & hsGMaterial::kCompNeedsBlendChannel){ Log::Info() << "kCompNeedsBlendChannel" << ", ";}
 							Log::Info() << std::endl;
+							}
 							Log::Info() << "\tLayers: " <<  mat->getLayers().size() << std::endl;
 							for(size_t lid = 0; lid < mat->getLayers().size(); ++lid){
 								plLayerInterface* lay = plLayerInterface::Convert(mat->getLayers()[lid]->getObj(), false);
 								if(lay->getTexture() != NULL){
-									Log::Info() << "\t\tTexture: " << lay->getTexture()->getName() << ", using UV " << (lay->getUVWSrc() & plLayerInterface::kUVWIdxMask) << " and LOD bias " << lay->getLODBias() << "." << std::endl;
+									Log::Info() << "\t\tTexture: " << lay->getTexture()->getName() << ", using UV " << (lay->getUVWSrc() & plLayerInterface::kUVWIdxMask) << " and LOD bias " << lay->getLODBias() << (!lay->getTransform().IsIdentity() ? ", custom" : "") << "." << std::endl;
+									
 									
 								}
+								
 								Log::Info() << "\t\tOpacity: " << lay->getOpacity() <<", ";
 								Log::Info() << "Power: " << lay->getSpecularPower() <<", ";
 								Log::Info() << std::endl;
@@ -280,6 +302,7 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 								const unsigned int fshade = lay->getState().fShadeFlags;
 								const unsigned int fz = lay->getState().fZFlags;
 								
+								if(fblend != 0){
 								Log::Info() << "\t\tBlend: ";
 								if(fblend & hsGMatState::kBlendTest){ Log::Info() << "kBlendTest" << ", "; }
 								if(fblend & hsGMatState::kBlendAlpha){ Log::Info() << "kBlendAlpha" << ", "; }
@@ -310,13 +333,16 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 								if(fblend & hsGMatState::kBlendRevSubtract){ Log::Info() << "kBlendRevSubtract" << ", "; }
 								if(fblend & hsGMatState::kBlendAlphaTestHigh){ Log::Info() << "kBlendAlphaTestHigh" << ", "; }
 								Log::Info() << std::endl;
-								
+								}
+								if(fclamp!=0){
 								Log::Info() << "\t\tClamp: ";
 								if(fclamp == hsGMatState::kClampTextureU){ Log::Info() << "kClampTextureU" << ", "; }
 								if(fclamp == hsGMatState::kClampTextureV){ Log::Info() << "kClampTextureV" << ", "; }
 								if(fclamp == hsGMatState::kClampTexture){ Log::Info() << "kClampTexture" << ", "; }
 								Log::Info() << std::endl;
+								}
 								
+								if(fmisc!=0){
 								Log::Info() << "\t\tMisc: ";
 								if(fmisc & hsGMatState::kMiscWireFrame){ Log::Info() << "kMiscWireFrame" << ", "; }
 								if(fmisc & hsGMatState::kMiscDrawMeshOutlines){ Log::Info() << "kMiscDrawMeshOutlines" << ", "; }
@@ -346,7 +372,9 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 								if(fmisc & hsGMatState::kMiscCam2Screen){ Log::Info() << "kMiscCam2Screen" << ", "; }
 								//if(fmisc & hsGMatState::kAllMiscFlags){ Log::Info() << "kAllMiscFlags" << ", "; }
 								Log::Info() << std::endl;
+								}
 								
+								if(fshade!=0){
 								Log::Info() << "\t\tShade: ";
 								if(fshade & hsGMatState::kShadeSoftShadow){ Log::Info() << "kShadeSoftShadow" << ", "; }
 								if(fshade & hsGMatState::kShadeNoProjectors){ Log::Info() << "kShadeNoProjectors" << ", "; }
@@ -366,7 +394,8 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 								if(fshade & hsGMatState::kShadeEmissive){ Log::Info() << "kShadeEmissive" << ", "; }
 								if(fshade & hsGMatState::kShadeReallyNoFog){ Log::Info() << "kShadeReallyNoFog" << ", "; }
 								Log::Info() << std::endl;
-								
+								}
+								if(fz != 0){
 								Log::Info() << "\t\tDepth: ";
 								if(fz & hsGMatState::kZIncLayer){ Log::Info() << "kZIncLayer" << ", "; }
 								if(fz & hsGMatState::kZClearZ){ Log::Info() << "kZClearZ" << ", "; }
@@ -375,7 +404,7 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 								//if(fz & kZMask){ Log::Info() << "kZMask" << ", "; }
 								if(fz & hsGMatState::kZLODBias){ Log::Info() << "kZLODBias" << ", "; }
 								Log::Info() << std::endl;
-								
+								}
 								if(lay->getVertexShader().Exists() && lay->getPixelShader().Exists()){
 									Log::Info() <<"\t\tShaders: " << lay->getVertexShader()->getName() << ", " << lay->getPixelShader()->getName() << std::endl;
 								}
@@ -410,7 +439,9 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 					_objects.back()->addSubObject(mesh, hsGMaterial::Convert(matKey->getObj(), false));
 				}
 			}
+			Log::Info() << std::endl;
 		}
+		
 	}
 
 	const auto textureKeys = rm.getKeys(ploc, pdUnifiedTypeMap::ClassIndex("plMipmap")); // TODO: also support envmap
