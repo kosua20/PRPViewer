@@ -110,6 +110,8 @@ void Object::draw(const glm::mat4& view, const glm::mat4& projection) const {
 	
 	// Compute the normal matrix
 	glm::mat3 normalMatrix = glm::transpose(glm::inverse(glm::mat3(MV)));
+	
+	
 	glEnable(GL_BLEND);
 	// Select the program (and shaders).
 	glUseProgram(_program->id());
@@ -126,31 +128,92 @@ void Object::draw(const glm::mat4& view, const glm::mat4& projection) const {
 		glBindTexture(_textures[i].cubemap ? GL_TEXTURE_CUBE_MAP : GL_TEXTURE_2D, _textures[i].id);
 	}*/
 
-	
+	const TextureInfos emptyInfos = Resources::manager().getTexture("");
+	//const glm::mat4 ident(1.0f);
 	for(const auto & subObject : _subObjects){
-		plKey tex = plLayerInterface::Convert(subObject.material->getLayers()[0]->getObj(), false)->getTexture();
-		const TextureInfos infos = Resources::manager().getTexture(tex != NULL ? tex->getName().to_std_string() : "");//(^Resources::manager().getTexture(subObject.material->getLayers()[0]->getObj());
-		
-		//Log::Info() << subObject.mesh.uvCount << std::endl;
-		if(infos.cubemap){
-			glActiveTexture(GL_TEXTURE1);
-			glBindTexture(GL_TEXTURE_CUBE_MAP, infos.id);
-			glUniform1i(_program->uniform("useCubemap"), 1);
-		} else {
-			glActiveTexture(GL_TEXTURE0);
-			glBindTexture(GL_TEXTURE_2D, infos.id);
-			glUniform1i(_program->uniform("useCubemap"), 0);
+		int tid = 0;
+		for(const auto & layKey : subObject.material->getLayers()){
+			if(tid>=8){
+				Log::Warning() << "8 layers reached, stopping." << std::endl;
+				break;
+			}
+			
+			plLayerInterface * lay = plLayerInterface::Convert(layKey->getObj(), false);
+			TextureInfos infos;
+			const std::string arrayPos = "[" + std::to_string(tid) + "]";
+			if(lay->getTexture().Exists()){
+				infos = Resources::manager().getTexture(lay->getTexture()->getName().to_std_string());
+				glUniformMatrix4fv(_program->uniform("uvMatrix"+arrayPos), 1, GL_FALSE, lay->getTransform().glMatrix());
+				if(infos.cubemap){
+					glActiveTexture(GL_TEXTURE0+8+tid);
+					glBindTexture(GL_TEXTURE_CUBE_MAP, infos.id);
+					glUniform1i(_program->uniform("useTexture"+arrayPos), 2);
+				} else {
+					glActiveTexture(GL_TEXTURE0+tid);
+					glBindTexture(GL_TEXTURE_2D, infos.id);
+					glUniform1i(_program->uniform("useTexture"+arrayPos), 1);
+				}
+				glUniform1i(_program->uniform("uvSource"+arrayPos), lay->getUVWSrc());
+			} else {
+				infos = emptyInfos;
+				glActiveTexture(GL_TEXTURE0+tid);
+				glBindTexture(GL_TEXTURE_2D, infos.id);
+				glUniform1i(_program->uniform("useTexture"+arrayPos), 0);
+			}
+			glUniform1i(_program->uniform("clampTexture"+arrayPos), lay->getState().fClampFlags & hsGMatState::kClampTexture ? 1 : 0);
+			
+			const unsigned int fshade = lay->getState().fShadeFlags;
+			
+			const auto ambient = lay->getAmbient();
+			const auto prediff = (fshade & hsGMatState::kShadeWhite) ? hsColorRGBA(1.0f,1.0f,1.0f,1.0f) : lay->getPreshade();
+			const auto diffuse = lay->getRuntime(); const float opac = lay->getOpacity();
+			const auto specular = (fshade & hsGMatState::kShadeSpecular) ? lay->getSpecular() : hsColorRGBA(0.0f,0.0f,0.0f,0.0f); const float specpow = lay->getSpecularPower();
+			
+			glUniform3f(_program->uniform("ambient"+arrayPos), ambient.r, ambient.g, ambient.b);
+			glUniform3f(_program->uniform("prediff"+arrayPos), prediff.r, prediff.g, prediff.b);
+			glUniform4f(_program->uniform("diffuse"+arrayPos), diffuse.r, diffuse.g, diffuse.b, opac);
+			glUniform4f(_program->uniform("specular"+arrayPos), specular.r, specular.g, specular.b, specpow);
+			
+			if(lay->getState().fZFlags & hsGMatState::kZNoZWrite){
+				glDepthMask(GL_FALSE);
+			}
+			if(lay->getState().fZFlags & hsGMatState::kZNoZRead){
+				glDisable(GL_DEPTH_TEST);
+			}
+			if(lay->getState().fMiscFlags & hsGMatState::kMiscTwoSided){
+				glDisable(GL_CULL_FACE);
+			}
+			
+			++tid;
+			if(lay->getState().fZFlags & hsGMatState::kZIncLayer){
+				glEnable(GL_POLYGON_OFFSET_FILL);
+				glPolygonOffset(0.0f, -tid*20.0f);
+			}
+			
+			
 		}
+		glUniform1i(_program->uniform("layerCount"), tid);
+		
+		
+		
 		glBindVertexArray(subObject.mesh.vId);
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, subObject.mesh.eId);
 		glDrawElements(GL_TRIANGLES, subObject.mesh.count, GL_UNSIGNED_INT, (void*)0);
+		
+		// Restore state after each subelement that can have a different material.
+		if(!(_type==Billboard) && !(_type==BillboardY)){
+			glEnable(GL_CULL_FACE);
+		}
+		glDepthMask(GL_TRUE);
+		glEnable(GL_DEPTH_TEST);
+		glPolygonOffset(0.0f, 0.0f);
+		glDisable(GL_POLYGON_OFFSET_FILL);
+		
 	}
 	glBindVertexArray(0);
 	glUseProgram(0);
 	glDisable(GL_BLEND);
-	if(_type == Billboard || _type == BillboardY){
-		glEnable(GL_CULL_FACE);
-	}
+	
 	
 }
 

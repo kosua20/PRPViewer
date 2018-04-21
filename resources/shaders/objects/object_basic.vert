@@ -13,17 +13,23 @@ layout(location = 8) in vec3 uv5;
 layout(location = 9) in vec3 uv6;
 layout(location = 10) in vec3 uv7;
 
+uniform mat4 uvMatrix[8];
+uniform int uvSource[8];
+uniform int useTexture[8];
+uniform int clampTexture[8];
+
+
 // Uniform: the MVP, MV and normal matrices
 uniform mat4 mvp;
 uniform mat3 normalMatrix;
 uniform int uvId = 0;
-
+uniform int layerCount;
 // Output: tangent space matrix, position in view space and uv.
 out INTERFACE {
 	vec4 col;
 	vec3 pos;
-	vec3 uv;
 	vec3 n;
+	vec3 uv[8];
 } Out ;
 
 
@@ -32,6 +38,18 @@ void main(){
 	gl_Position = mvp * vec4(v, 1.0);
 	Out.col = col;
 	Out.pos = v;
-	Out.uv = (uvId == 0 ? uv0 : (uvId == 1 ? uv1 : (uvId == 2 ? uv2 : (uvId == 3 ? uv3 : (uvId == 4 ? uv4 : (uvId == 5 ? uv5 : (uvId == 6 ? uv6 : uv7 )))))));
 	Out.n = n;
+	//Out.
+	for(int i = 0; i < 1; ++i){
+		if(useTexture[i]>0){
+			int uvId = uvSource[i];
+			vec3 selectedUV = (uvId == 0 ? uv0 : (uvId == 1 ? uv1 : (uvId == 2 ? uv2 : (uvId == 3 ? uv3 : (uvId == 4 ? uv4 : (uvId == 5 ? uv5 : (uvId == 6 ? uv6 : uv7 )))))));
+			
+			Out.uv[i] = vec3(uvMatrix[i] * vec4(selectedUV, 0.0));
+			if(clampTexture[i]>0){
+				Out.uv[i] = clamp(Out.uv[i], 0.0, 1.0);
+			}
+		}
+	}
+	
 }
