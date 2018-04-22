@@ -401,6 +401,18 @@ const std::shared_ptr<ProgramInfos> Resources::getProgram(const std::string & na
 	return _programs[name];
 }
 
+const std::shared_ptr<ProgramInfos> Resources::registerProgram(const std::string & name, const std::string & vertexContent, const std::string & fragmentContent) {
+	if (_programs.count(name) > 0) {
+		return _programs[name];
+	}
+	
+	_programs.emplace(std::piecewise_construct,
+					  std::forward_as_tuple(name),
+					  std::forward_as_tuple(new ProgramInfos(vertexContent, fragmentContent, true)));
+	
+	return _programs[name];
+}
+
 void Resources::reload() {
 	for (auto & prog : _programs) {
 		prog.second->reload();

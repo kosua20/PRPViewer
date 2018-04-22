@@ -14,6 +14,8 @@ public:
 	
 	ProgramInfos(const std::string & vertexName, const std::string & fragmentName);
 	
+	ProgramInfos(const std::string & vertexContent, const std::string & fragmentContent, const bool dummy);
+	
 	~ProgramInfos();
 	
 	const GLint uniform(const std::string & name) const;
@@ -34,12 +36,15 @@ public:
 	
 private:
 	
+	void setup(const std::string & vertexContent, const std::string & fragmentContent);
+	
 	GLuint _id;
 	std::string _vertexName;
 	std::string _fragmentName;
 	std::map<std::string, GLint> _uniforms;
 	std::map<std::string, int> _textures;
 	std::map<std::string, glm::vec3> _vec3s;
+	bool _inMemory;
 	
 };
 

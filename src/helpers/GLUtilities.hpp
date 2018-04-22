@@ -31,11 +31,7 @@ struct TextureInfos {
 
 };
 
-static const bool isInFrustum(const glm::vec3 & point, const glm::mat4 & viewproj)  {
-	const auto homCoords = viewproj * glm::vec4(point, 1.0f);
-	const glm::vec3 clipCoords = glm::vec3(homCoords)/homCoords.w;
-	return (std::abs(clipCoords.x) <= 1.0f) && (std::abs(clipCoords.y) <= 1.0f) && (std::abs(clipCoords.z) <= 1.0f);
-}
+
 
 static const unsigned char getQuadrant(const glm::vec3 & point, const glm::mat4 & viewproj)  {
 	const auto homCoords = viewproj * glm::vec4(point, 1.0f);

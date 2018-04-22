@@ -15,10 +15,23 @@ ProgramInfos::ProgramInfos(){
 ProgramInfos::ProgramInfos(const std::string & vertexName, const std::string & fragmentName){
 	_vertexName = vertexName;
 	_fragmentName = fragmentName;
-	
+	_inMemory = false;
 	const std::string vertexContent = Resources::manager().getShader(_vertexName, Resources::Vertex);
 	const std::string fragmentContent = Resources::manager().getShader(_fragmentName, Resources::Fragment);
 	
+	setup(vertexContent, fragmentContent);
+	
+}
+
+
+ProgramInfos::ProgramInfos(const std::string & vertexContent, const std::string & fragmentContent, const bool dummy){
+	_vertexName = vertexContent;
+	_fragmentName = fragmentContent;
+	_inMemory = true;
+	setup(vertexContent, fragmentContent);
+}
+
+void ProgramInfos::setup(const std::string & vertexContent, const std::string & fragmentContent){
 	_id = GLUtilities::createProgram(vertexContent, fragmentContent);
 	_uniforms.clear();
 	_textures.clear();
@@ -58,10 +71,7 @@ ProgramInfos::ProgramInfos(const std::string & vertexName, const std::string & f
 	}
 	glUseProgram(0);
 	checkGLError();
-	
-	
 }
-
 
 const GLint ProgramInfos::uniform(const std::string & name) const {
 	if(_uniforms.count(name) > 0) {
@@ -94,8 +104,16 @@ void ProgramInfos::cacheUniformArray(const std::string & name, const std::vector
 
 void ProgramInfos::reload()
 {
-	const std::string vertexContent = Resources::manager().getShader(_vertexName, Resources::Vertex);
-	const std::string fragmentContent = Resources::manager().getShader(_fragmentName, Resources::Fragment);
+	std::string vertexContent;
+	std::string fragmentContent;
+	if(_inMemory){
+		vertexContent = _vertexName;
+		fragmentContent = _fragmentName;
+	} else {
+		vertexContent = Resources::manager().getShader(_vertexName, Resources::Vertex);
+		fragmentContent = Resources::manager().getShader(_fragmentName, Resources::Fragment);
+	}
+	
 	_id = GLUtilities::createProgram(vertexContent, fragmentContent);
 	// For each stored uniform, update its location, and update textures slots and cached values.
 	glUseProgram(_id);
