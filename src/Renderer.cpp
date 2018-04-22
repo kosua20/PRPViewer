@@ -42,7 +42,7 @@ void Renderer::draw(){
 	static bool showTextures = false;
 	static int objectId = 0;
 	static bool showObject = false;
-	static bool wireframe = false;
+	static bool wireframe = true;
 	static bool doCulling = true;
 	static float cullingDistance = 1500.0f;
 	static int drawCount = 0;

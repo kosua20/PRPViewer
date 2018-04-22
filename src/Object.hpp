@@ -26,13 +26,14 @@ public:
 	struct SubObject {
 		MeshInfos mesh;
 		hsGMaterial * material;
+		unsigned int mode;
 	};
 	
 	Object(const Type & type, std::shared_ptr<ProgramInfos> prog, const glm::mat4 & model, const std::string & name);
 
 	~Object();
 	
-	void addSubObject(const MeshInfos & infos, hsGMaterial * material);
+	void addSubObject(const MeshInfos & infos, hsGMaterial * material, const unsigned int shadingMode);
 	
 	/// Update function
 	void update(const glm::mat4& model);
