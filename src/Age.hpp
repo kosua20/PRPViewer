@@ -47,6 +47,8 @@ public:
 	
 private:
 	
+	std::shared_ptr<ProgramInfos> generateShaders(hsGMaterial * mat);
+	
 	void loadMeshes( plResManager & rm, const plLocation& ploc);
 	
 	std::string _name;
