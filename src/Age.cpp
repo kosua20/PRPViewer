@@ -506,6 +506,8 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 					// Get the mesh internal representation.
 					plIcicle* ice = span->getIcicle(di.fIndices[id]);
 					const hsMatrix44 transfoMatrix = (bakePosition ? ice->getLocalToWorld() : hsMatrix44::Identity());
+					hsMatrix44 transfoMatrixNormal = transfoMatrix;
+					transfoMatrixNormal.setTranslate(hsVector3(0.0f,0.0f,0.0f));
 					//Log::Info() << (ice->getWorldBounds().getMins()+ice->getWorldBounds().getMaxs())*0.5f << std::endl;
 					//Log::Info() << (ice->getWorldBounds().getCorner()) << std::endl;
 					// if we have to bake the icicle specific position, use it.
@@ -538,7 +540,7 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 					
 					for (size_t j = 0; j < verts.size(); j++) {
 						const hsVector3 pos = transfoMatrix.multPoint(verts[j].fPos);
-						const auto fnorm = verts[j].fNormal;
+						const auto fnorm = transfoMatrixNormal.multVector(verts[j].fNormal);
 						meshPositions[j] = glm::vec3(pos.X, pos.Y, pos.Z);
 						meshNormals[j] = glm::vec3(fnorm.X, fnorm.Y, fnorm.Z);
 						const unsigned int color = verts[j].fColor;

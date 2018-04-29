@@ -161,7 +161,7 @@ void main(){
 	fragColor = vec4(finalColor, fCurrAlpha);
 	
 	
-	
+	fragColor = vec4(normalize(In.camNor.xyz)*0.5+0.5, 1.0);
 	//vec4 img = (useTexture==1) ?  texture(textures[0], In.uv[0].xy) : texture(cubemaps[0], normalize(In.uv[0].xyz));
 	
 	// Local variable to store the color value
