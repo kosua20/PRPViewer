@@ -21,9 +21,12 @@ Renderer::Renderer(Config & config) : _config(config) {
 	// Setup camera parameters.
 	_camera.projection(config.screenResolution[0]/config.screenResolution[1], 1.3f, 0.1f, 8000.0f);
 	for(int i = 0; i < 8; ++i){
-		Resources::manager().getProgram("object_basic")->registerTexture("textures["+std::to_string(i)+"]", i);
-		Resources::manager().getProgram("object_basic")->registerTexture("cubemaps["+std::to_string(i)+"]", 8+i);
+		//Resources::manager().getProgram("object_basic")->registerTexture("textures["+std::to_string(i)+"]", i);
+		//Resources::manager().getProgram("object_basic")->registerTexture("cubemaps["+std::to_string(i)+"]", 8+i);
 	}
+	Resources::manager().getProgram("object_basic")->registerTexture("textures", 0);
+	Resources::manager().getProgram("object_basic")->registerTexture("cubemaps", 1);
+	
 	
 	std::vector<std::string> files = ImGui::listFiles("../../../data/mystv/", false, false, {"age"});
 	

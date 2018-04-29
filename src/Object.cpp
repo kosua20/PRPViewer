@@ -121,29 +121,34 @@ void Object::draw(const glm::mat4& view, const glm::mat4& projection) const {
 	// Select the program (and shaders).
 	glUseProgram(_program->id());
 
+	glUniformMatrix4fv(_program->uniform("mv"), 1, GL_FALSE, &MV[0][0]);
+	glUniformMatrix4fv(_program->uniform("mvp"), 1, GL_FALSE, &MVP[0][0]);
+	glUniformMatrix4fv(_program->uniform("invV"), 1, GL_FALSE, &invV[0][0]);
+	glUniformMatrix3fv(_program->uniform("normalMatrix"), 1, GL_FALSE, &normalMatrix[0][0]);
+	
 	const TextureInfos emptyInfos = Resources::manager().getTexture("");
 	//const glm::mat4 ident(1.0f);
 	for(const auto & subObject : _subObjects){
 		int tid = 0;
 		for(const auto & layKey : subObject.material->getLayers()){
 			if(tid>=10){
-				Log::Warning() << "10 layers reached, stopping." << std::endl;
+				//Log::Warning() << "10 layers reached, stopping." << std::endl;
 				break;
 			}
-			const std::string arrayPos = "[" + std::to_string(tid) + "]";
+			const std::string arrayPos = "";//[" + std::to_string(tid) + "]";
 			plLayerInterface * lay = plLayerInterface::Convert(layKey->getObj(), false);
 			
 			TextureInfos infos;
 			
-			if(lay->getTexture().Exists() && tid < 8){
+			if(lay->getTexture().Exists()){
 				infos = Resources::manager().getTexture(lay->getTexture()->getName().to_std_string());
 				glUniformMatrix4fv(_program->uniform("uvMatrix"+arrayPos), 1, GL_FALSE, lay->getTransform().glMatrix());
 				if(infos.cubemap){
-					glActiveTexture(GL_TEXTURE0+8+tid);
+					glActiveTexture(GL_TEXTURE0+1);
 					glBindTexture(GL_TEXTURE_CUBE_MAP, infos.id);
 					glUniform1i(_program->uniform("useTexture"+arrayPos), 2);
 				} else {
-					glActiveTexture(GL_TEXTURE0+tid);
+					glActiveTexture(GL_TEXTURE0+0);
 					glBindTexture(GL_TEXTURE_2D, infos.id);
 					glUniform1i(_program->uniform("useTexture"+arrayPos), 1);
 				}
@@ -305,40 +310,40 @@ void Object::draw(const glm::mat4& view, const glm::mat4& projection) const {
 			if(lay->getState().fMiscFlags & hsGMatState::kMiscTwoSided){
 				glDisable(GL_CULL_FACE);
 			}
-			
+			glUniform1i(_program->uniform("layerCount"), tid);
 			++tid;
 			if(lay->getState().fZFlags & hsGMatState::kZIncLayer){
 				glEnable(GL_POLYGON_OFFSET_FILL);
 				glPolygonOffset(0.0f, -tid*20.0f);
 			}
 			
-			
+			checkGLError();
+			glBindVertexArray(subObject.mesh.vId);
+			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, subObject.mesh.eId);
+			checkGLError();
+			glDrawElements(GL_TRIANGLES, subObject.mesh.count, GL_UNSIGNED_INT, (void*)0);
+			checkGLError();
+			glBindVertexArray(0);
+			//glUseProgram(0);
+			glDisable(GL_BLEND);
+			checkGLError();
+			glDepthMask(GL_TRUE);
+			glEnable(GL_DEPTH_TEST);
+			glPolygonOffset(0.0f, 0.0f);
+			glDisable(GL_POLYGON_OFFSET_FILL);
 		}
-		glUniform1i(_program->uniform("layerCount"), tid);
-		glUniformMatrix4fv(_program->uniform("mv"), 1, GL_FALSE, &MV[0][0]);
-		glUniformMatrix4fv(_program->uniform("mvp"), 1, GL_FALSE, &MVP[0][0]);
-		glUniformMatrix4fv(_program->uniform("invV"), 1, GL_FALSE, &invV[0][0]);
-		glUniformMatrix3fv(_program->uniform("normalMatrix"), 1, GL_FALSE, &normalMatrix[0][0]);
 		
-		
-		
-		glBindVertexArray(subObject.mesh.vId);
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, subObject.mesh.eId);
-		glDrawElements(GL_TRIANGLES, subObject.mesh.count, GL_UNSIGNED_INT, (void*)0);
 		
 		// Restore state after each subelement that can have a different material.
 		if(!(_type==Billboard) && !(_type==BillboardY)){
 			glEnable(GL_CULL_FACE);
 		}
-		glDepthMask(GL_TRUE);
-		glEnable(GL_DEPTH_TEST);
-		glPolygonOffset(0.0f, 0.0f);
-		glDisable(GL_POLYGON_OFFSET_FILL);
 		
 	}
 	glBindVertexArray(0);
 	glUseProgram(0);
 	glDisable(GL_BLEND);
+	checkGLError();
 	
 	
 }
