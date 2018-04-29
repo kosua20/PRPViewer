@@ -93,7 +93,9 @@ void Log::flush(){
 			_file << finalStr << std::flush;
 		}
 		
-		_fullLog.append(finalStr);
+		if(_level != LogLevel::INFO){
+			_fullLog.append(finalStr);
+		}
 	}
 	_ignoreUntilFlush = false;
 	_appendPrefix = false;

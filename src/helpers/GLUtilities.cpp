@@ -73,15 +73,10 @@ GLuint GLUtilities::loadShader(const std::string & prog, GLuint type){
 		glGetShaderiv(id, GL_INFO_LOG_LENGTH, &infoLogLength);
 		std::vector<char> infoLog((std::max)(infoLogLength, int(1)));
 		glGetShaderInfoLog(id, infoLogLength, NULL, &infoLog[0]);
-
-		Log::Error() << std::endl 
-					<< "*--- " 
-					<< (type == GL_VERTEX_SHADER ? "Vertex" : (type == GL_FRAGMENT_SHADER ? "Fragment" : "Geometry (or tess.)")) 
-					<< " shader failed to compile ---*" 
-					<< std::endl
-					<< &infoLog[0]
-					<< "*---------------------------------*" 
-					<< std::endl << std::endl;
+		
+		Log::Error() << Log::OpenGL
+					<< (type == GL_VERTEX_SHADER ? "Vertex" : (type == GL_FRAGMENT_SHADER ? "Fragment" : "Geometry (or tess.)"))  << " shader failed to compile:\n\t"
+					<< &infoLog[0] << (infoLog[infoLogLength-2] == '\n' ? "" : "\n") << std::flush;
 	}
 	// Return the id to the successfuly compiled  shader program.
 	return id;
@@ -117,7 +112,7 @@ GLuint GLUtilities::createProgram(const std::string & vertexContent, const std::
 		std::vector<char> infoLog((std::max)(infoLogLength, int(1)));
 		glGetProgramInfoLog(id, infoLogLength, NULL, &infoLog[0]);
 
-		Log::Error() << Log::OpenGL << "Failed loading program: " << &infoLog[0] << std::endl;
+		Log::Error() << Log::OpenGL << "Failed loading program:\n\t" << &infoLog[0] << (infoLog[infoLogLength-2] == '\n' ? "" : "\n") << std::flush;
 		return 0;
 	}
 	// We can now clean the shaders objects, by first detaching them
