@@ -4,6 +4,7 @@
 #include "helpers/InterfaceUtilities.hpp"
 #include "helpers/Logger.hpp"
 #include <glm/gtx/norm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #include <stdio.h>
 #include <vector>
 
@@ -151,6 +152,27 @@ void Renderer::draw(){
 			}
 		}
 	}
+	
+	const float scale = glm::length(_camera.getDirection());
+	const glm::mat4 MVP = _camera.projection() * _camera.view() * glm::scale(glm::translate(glm::mat4(1.0f), _camera.getCenter()), glm::vec3(0.015f*scale));
+	const auto debugProgram = Resources::manager().getProgram("camera-center");
+	const auto debugObject = Resources::manager().getMesh("sphere");
+	glDisable(GL_BLEND);
+	glEnable(GL_DEPTH_TEST);
+	glDisable(GL_CULL_FACE);
+	glUseProgram(debugProgram->id());
+	glBindVertexArray(debugObject.vId);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, debugObject.eId);
+	
+	glUniformMatrix4fv(debugProgram->uniform("mvp"), 1, GL_FALSE, &MVP[0][0]);
+	glUniform2f(debugProgram->uniform("screenSize"), _config.screenResolution[0], _config.screenResolution[1]);
+	glDrawElements(GL_TRIANGLES, debugObject.count, GL_UNSIGNED_INT, (void*)0);
+	
+	
+	
+	glBindVertexArray(0);
+	glUseProgram(0);
+	glEnable(GL_CULL_FACE);
 	glDisable(GL_DEPTH_TEST);
 	
 	checkGLError();

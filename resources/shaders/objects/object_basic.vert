@@ -58,7 +58,8 @@ void main(){
 	
 	vec4 clipPos = mvp * vec4(v, 1.0);
 	gl_Position = clipPos;
-	gl_Position.z = gl_Position.z * 2.0 - gl_Position.w;
+	// TODO: reenable.
+	// gl_Position.z = gl_Position.z * 2.0 - gl_Position.w;
 	
 	//for(int i = 0; i < layerCount; ++i){
 		vec4 vertexCol = col;//.bgra;
