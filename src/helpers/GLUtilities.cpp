@@ -484,7 +484,7 @@ MeshInfos GLUtilities::setupBuffers(const Mesh & mesh){
 	if(vbo_color > 0){
 		glEnableVertexAttribArray(currentAttribute);
 		glBindBuffer(GL_ARRAY_BUFFER, vbo_color);
-		glVertexAttribPointer(currentAttribute, 4, GL_BYTE, GL_TRUE, 0, NULL);
+		glVertexAttribPointer(currentAttribute, 4, GL_UNSIGNED_BYTE, GL_TRUE, 0, NULL);
 		++currentAttribute;
 	}
 	
