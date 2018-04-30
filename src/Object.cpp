@@ -73,10 +73,6 @@ void Object::drawDebug(const glm::mat4& view, const glm::mat4& projection) const
 	}
 	
 	if(_type != Billboard && _type != BillboardY){
-		
-		
-		
-		
 		const auto center = _globalBounds.center;
 		const auto scale = _globalBounds.getScale()*0.5f;
 		glm::mat4 iden = glm::scale(glm::translate(glm::mat4(1.0f), center), scale);
@@ -126,32 +122,43 @@ void Object::draw(const glm::mat4& view, const glm::mat4& projection) const {
 	for(const auto & subObject : _subObjects){
 		int tid = 0;
 		// Render each layer, one after the other.
+		bool forceDecal = subObject.material->getCompFlags() & hsGMaterial::kCompDecal;
 		for(const auto & layKey : subObject.material->getLayers()){
-			if(tid>=8){
-				Log::Warning() << "8 layers reached." << std::endl;
-			}
+			
 			// Obtain the layer to aply.
 			plLayerInterface * lay = plLayerInterface::Convert(layKey->getObj(), false);
 			
-			// Setup Z state.
-			if(lay->getState().fZFlags & hsGMatState::kZNoZWrite){
+			// Default state:
+			glDepthMask(GL_TRUE);
+			glDepthFunc(GL_LEQUAL);
+			glEnable(GL_DEPTH_TEST);
+			glPolygonOffset(0.0f, 0.0f);
+			glDisable(GL_POLYGON_OFFSET_FILL);
+			if(!(_type == Billboard) && !(_type == BillboardY)){
+				glDisable(GL_CULL_FACE);
+			}
+			
+			// Setup Z state (DONE).
+			const unsigned int zflag = lay->getState().fZFlags;
+			if((zflag & hsGMatState::kZNoZWrite) || forceDecal){
 				glDepthMask(GL_FALSE);
 			}
-			if(lay->getState().fZFlags & hsGMatState::kZNoZRead){
-				glDisable(GL_DEPTH_TEST);
+			if(zflag & hsGMatState::kZNoZRead){
+				glDepthFunc(GL_ALWAYS);
+			}
+			if(zflag & hsGMatState::kZClearZ){
+				glDepthFunc(GL_ALWAYS);
+			}
+			if((zflag & hsGMatState::kZIncLayer) || forceDecal){
+				glEnable(GL_POLYGON_OFFSET_FILL);
+				glPolygonOffset(-10.0f,-(tid+1)*10.0f);
 			}
 			if(lay->getState().fMiscFlags & hsGMatState::kMiscTwoSided){
 				glDisable(GL_CULL_FACE);
 			}
-			glUniform1i(_program->uniform("layerCount"), tid);
-			
-			if(lay->getState().fZFlags & hsGMatState::kZIncLayer){
-				glEnable(GL_POLYGON_OFFSET_FILL);
-				glPolygonOffset(0.0f, -(tid+1)*20.0f);
-			}
 			checkGLError();
 			
-			// Setup shading state.
+			// Setup shading state (DONE).
 			const unsigned int fshade = lay->getState().fShadeFlags;
 			
 			switch(subObject.mode){
@@ -231,62 +238,103 @@ void Object::draw(const glm::mat4& view, const glm::mat4& projection) const {
 			}
 			checkGLError();
 			
-			// Setup blending state.
+			// Setup blending state (DOING).
 			glEnable(GL_BLEND);
-			const unsigned int fblend = lay->getState().fBlendFlags;
-			glUniform1i(_program->uniform("invertAlpha"), fblend & hsGMatState::kBlendInvertAlpha);
+			const unsigned int bflags = lay->getState().fBlendFlags;
+			glUniform1i(_program->uniform("invertVertexAlpha"), bflags & hsGMatState::kBlendInvertVtxAlpha ? 1 : 0);
 			
-			glUniform1i(_program->uniform("useReflectionXform"), lay->getState().fMiscFlags &  hsGMatState::kMiscUseReflectionXform);
-			glUniform1i(_program->uniform("useRefractionXform"), lay->getState().fMiscFlags &  hsGMatState::kMiscUseRefractionXform);
+			glUniform1i(_program->uniform("blendInvertColor"), bflags & hsGMatState::kBlendInvertColor ? 1 : 0);
+			glUniform1i(_program->uniform("blendInvertAlpha"), bflags & hsGMatState::kBlendInvertAlpha ? 1 : 0);
 			
-			glUniform1i(_program->uniform("blendInvertColor"), fblend & hsGMatState::kBlendInvertColor);
-			glUniform1i(_program->uniform("blendNoTexColor"), fblend & hsGMatState::kBlendNoTexColor);
-			glUniform1i(_program->uniform("blendInvertAlpha"), fblend & hsGMatState::kBlendInvertAlpha);
-			glUniform1i(_program->uniform("blendNoVtxAlpha"), fblend & hsGMatState::kBlendNoVtxAlpha);
-			glUniform1i(_program->uniform("blendNoTexAlpha"), fblend & hsGMatState::kBlendNoTexAlpha);
-			glUniform1i(_program->uniform("blendAlphaAdd"), fblend & hsGMatState::kBlendAlphaAdd);
-			glUniform1i(_program->uniform("blendAlphaMult"), fblend & hsGMatState::kBlendAlphaMult);
+			glUniform1i(_program->uniform("blendNoTexColor"), bflags & hsGMatState::kBlendNoTexColor ? 1 : 0);
+			glUniform1i(_program->uniform("blendNoVtxAlpha"), bflags & hsGMatState::kBlendNoVtxAlpha ? 1 : 0);
+			glUniform1i(_program->uniform("blendNoTexAlpha"), bflags & hsGMatState::kBlendNoTexAlpha ? 1 : 0);
 			
-			switch(fblend & hsGMatState::kBlendMask){
-				case hsGMatState::kBlendAddColorTimesAlpha:
-				glUniform1i(_program->uniform("blendMode"), 1);
-				break;
-				case hsGMatState::kBlendAlpha:
-				glUniform1i(_program->uniform("blendMode"), 2);
-				break;
-				case hsGMatState::kBlendAdd:
-				glUniform1i(_program->uniform("blendMode"), 3);
-				break;
-				case hsGMatState::kBlendMult:
-				glUniform1i(_program->uniform("blendMode"), 4);
-				break;
-				case hsGMatState::kBlendDot3:
-				glUniform1i(_program->uniform("blendMode"), 5);
-				break;
-				case hsGMatState::kBlendAddSigned:
-				glUniform1i(_program->uniform("blendMode"), 6);
-				break;
-				case hsGMatState::kBlendAddSigned2X:
-				glUniform1i(_program->uniform("blendMode"), 7);
-				break;
-				default:
-				break;
+			if (bflags & hsGMatState::kBlendNoColor) {
+				// dst = dst
+				glBlendFunc(GL_ZERO, GL_ONE);
+			} else {
+				switch (bflags & hsGMatState::kBlendMask) {
+					case hsGMatState::kBlendDetail:
+					case hsGMatState::kBlendAlpha:
+						// dst = a * src + (1-a) * dst
+						// support a = 1 - a'
+						if (bflags & hsGMatState::kBlendInvertFinalAlpha) {
+							glBlendFunc(GL_ONE_MINUS_SRC_ALPHA, GL_SRC_ALPHA);
+						} else {
+							glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+						}
+						break;
+						
+					case hsGMatState::kBlendMult:
+						// dst = src * dst
+						// support src = 1 - src'
+						if (bflags & hsGMatState::kBlendInvertFinalColor) {
+							glBlendFunc(GL_ZERO, GL_ONE_MINUS_SRC_COLOR);
+						} else {
+							glBlendFunc(GL_ZERO, GL_SRC_COLOR);
+						}
+						break;
+						
+					case hsGMatState::kBlendAdd:
+						// dst = dst + src
+						glBlendFunc(GL_ONE, GL_ONE);
+						break;
+					case hsGMatState::kBlendMADD:
+						// dst = src * dest + dest
+						glBlendFunc(GL_DST_COLOR, GL_ONE);
+						break;
+					case hsGMatState::kBlendAddColorTimesAlpha:
+						// dst = src * a + dst
+						if (bflags & hsGMatState::kBlendInvertFinalAlpha) {
+							glBlendFunc(GL_ONE_MINUS_SRC_ALPHA, GL_ONE);
+						} else {
+							glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+						}
+						break;
+						
+					case hsGMatState::kBlendDot3:
+						// dst = src . dst
+						Log::Warning() << "Unsupported blend mode." << std::endl;
+						break;
+					case hsGMatState::kBlendAddSigned:
+						// dst = src + dst - 0.5
+						Log::Warning() << "Unsupported blend mode." << std::endl;
+						break;
+					case hsGMatState::kBlendAddSigned2X:
+						// dst = 2*(src + dst) - 1.0
+						Log::Warning() << "Unsupported blend mode." << std::endl;
+						break;
+					case 0:
+						// dst = src
+						glBlendFunc(GL_ONE, GL_ZERO);
+						break;
+						
+					default:
+						Log::Error() << "Blend mode doesn't exist." << std::endl;
+						break;
+				}
 			}
+				
+			//glUniform1i(_program->uniform("blendAlphaAdd"), fblend & hsGMatState::kBlendAlphaAdd);
+			//glUniform1i(_program->uniform("blendAlphaMult"), fblend & hsGMatState::kBlendAlphaMult);
 			
 			
-			if (fblend & (hsGMatState::kBlendTest | hsGMatState::kBlendAlpha | hsGMatState::kBlendAddColorTimesAlpha)
-				&& !(fblend & hsGMatState::kBlendAlphaAlways)) {
-				if (fblend & hsGMatState::kBlendAlphaTestHigh) {
-					glUniform1f(_program->uniform("alphaThreshold"), 40.f/255.f);
+			
+			// Alpha threshold state (DONE).
+			if (bflags & (hsGMatState::kBlendTest | hsGMatState::kBlendAlpha | hsGMatState::kBlendAddColorTimesAlpha)
+				&& !(bflags & hsGMatState::kBlendAlphaAlways)) {
+				if (bflags & hsGMatState::kBlendAlphaTestHigh) {
+					glUniform1f(_program->uniform("alphaThreshold"), 40.0f/255.0f);
 				} else {
-					glUniform1f(_program->uniform("alphaThreshold"), 1.f/255.f);
+					glUniform1f(_program->uniform("alphaThreshold"), 1.0f/255.0f);
 				}
 			} else {
 				glUniform1f(_program->uniform("alphaThreshold"), 0.f);
 			}
 			checkGLError();
 			
-			// Setup texture state.
+			// Setup texture state (DONE).
 			TextureInfos infos;
 			if(lay->getTexture().Exists()){
 				infos = Resources::manager().getTexture(lay->getTexture()->getName().to_std_string());
@@ -309,14 +357,16 @@ void Object::draw(const glm::mat4& view, const glm::mat4& projection) const {
 				} else {
 					glUniform1i(_program->uniform("uvSource"), lay->getUVWSrc() & plLayer::kUVWIdxMask);
 				}
-				//TODO:
+				
 			} else {
 				infos = emptyInfos;
 				glActiveTexture(GL_TEXTURE0+tid);
 				glBindTexture(GL_TEXTURE_2D, infos.id);
 				glUniform1i(_program->uniform("useTexture"), 0);
 			}
-			glUniform1i(_program->uniform("clampedTexture"), lay->getState().fClampFlags & hsGMatState::kClampTexture ? 1 : 0);
+			glUniform2i(_program->uniform("clampedTexture"), lay->getState().fClampFlags & hsGMatState::kClampTextureU ? 1 : 0, lay->getState().fClampFlags & hsGMatState::kClampTextureV ? 1 : 0);
+			glUniform1i(_program->uniform("useReflectionXform"), lay->getState().fMiscFlags &  hsGMatState::kMiscUseReflectionXform ? 1 : 0);
+			glUniform1i(_program->uniform("useRefractionXform"), lay->getState().fMiscFlags &  hsGMatState::kMiscUseRefractionXform ? 1 : 0);
 			checkGLError();
 			
 			// Render.
@@ -328,10 +378,8 @@ void Object::draw(const glm::mat4& view, const glm::mat4& projection) const {
 			// Reset states.
 			glBindVertexArray(0);
 			glDisable(GL_BLEND);
-			glDepthMask(GL_TRUE);
-			glEnable(GL_DEPTH_TEST);
-			glPolygonOffset(0.0f, 0.0f);
-			glDisable(GL_POLYGON_OFFSET_FILL);
+			//glDepthMask(GL_TRUE);
+			
 			checkGLError();
 			
 			++tid;
@@ -347,6 +395,12 @@ void Object::draw(const glm::mat4& view, const glm::mat4& projection) const {
 	
 	glUseProgram(0);
 	glDisable(GL_BLEND);
+	glDepthMask(GL_TRUE);
+	glDepthFunc(GL_LEQUAL);
+	glEnable(GL_DEPTH_TEST);
+	glPolygonOffset(0.0f, 0.0f);
+	glDisable(GL_POLYGON_OFFSET_FILL);
+	glEnable(GL_CULL_FACE);
 	checkGLError();
 	
 }
