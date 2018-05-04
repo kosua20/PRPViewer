@@ -17,6 +17,7 @@ Log::Log(){
 	_level = LogLevel::INFO;
 	_logToStdin = true;
 	_verbose = false;
+	_mute = false;
 	_ignoreUntilFlush = false;
 	_appendPrefix = false;
 }
@@ -25,6 +26,7 @@ Log::Log(const std::string & filePath, const bool logToStdin, const bool verbose
 	_level = LogLevel::INFO;
 	_logToStdin = logToStdin;
 	_verbose = verbose;
+	_mute = false;
 	_ignoreUntilFlush = false;
 	_appendPrefix = false;
 	// Create file if it doesnt exist.
@@ -51,7 +53,23 @@ void Log::setVerbose(const bool verbose){
 	_verbose = verbose;
 }
 
+void Log::mute(){
+	flush();
+	_mute = true;
+}
 
+void Log::unmute(){
+	flush();
+	_mute = false;
+}
+
+void Log::Mute(){
+	_defaultLogger->mute();
+}
+
+void Log::Unmute(){
+	_defaultLogger->unmute();
+}
 
 
 void Log::setDefaultFile(const std::string & filePath){
@@ -78,7 +96,7 @@ Log& Log::Error(){
 }
 
 void Log::flush(){
-	if(!_ignoreUntilFlush){
+	if(!_ignoreUntilFlush && !_mute){
 		
 		const std::string finalStr =  _stream.str();
 		

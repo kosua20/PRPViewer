@@ -45,6 +45,10 @@ public:
 	
 	void setVerbose(const bool verbose);
 	
+	void mute();
+	
+	void unmute();
+	
 	void display();
 	
 	template<class T>
@@ -92,6 +96,10 @@ public:
 	static Log& Warning();
 	
 	static Log& Error();
+	
+	static void Mute();
+	
+	static void Unmute();
 
 private:
 	
@@ -105,6 +113,7 @@ private:
 	std::stringstream _stream;
 	std::string _fullLog;
 	bool _verbose;
+	bool _mute;
 	bool _ignoreUntilFlush;
 	bool _appendPrefix;
 	
