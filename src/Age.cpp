@@ -42,24 +42,18 @@ Age::Age(const std::string & path){
 	Log::Info() << "Age " << _name << ":" << std::endl;
 	
 	const size_t pageCount = age->getNumPages();
-	Log::Info() << pageCount << " pages." << std::endl;
+	Log::Info() << pageCount << " pages, " << std::flush;
 	for(int i = 0 ; i < pageCount; ++i){
-		Log::Info() << "Page: " << age->getPageFilename(i, plasmaVersion) << " ";
 		const plLocation ploc = age->getPageLoc(i, plasmaVersion);
 		loadMeshes(*_rm, ploc);
-		Log::Info() << std::endl;
 	}
-	Log::Info() << std::endl;
 	
 	const size_t commmonCount = age->getNumCommonPages(plasmaVersion);
 	Log::Info() << commmonCount << " common pages." << std::endl;
 	for(int i = 0 ; i < commmonCount; ++i){
-		Log::Info() << "Page: " << age->getCommonPageFilename(i, plasmaVersion) << " ";
 		const plLocation ploc = age->getCommonPageLoc(i, plasmaVersion);
 		loadMeshes(*_rm, ploc);
-		Log::Info() << std::endl;
 	}
-	Log::Info() << std::endl;
 	
 	checkGLError();
 	Log::Info() << "Objects: " << _objects.size() << std::endl;
@@ -89,42 +83,13 @@ std::shared_ptr<ProgramInfos> Age::generateShaders(hsGMaterial * mat){
 	vertexLines.emplace_back("layout(location = 0) in vec3 v;");
 	vertexLines.emplace_back("layout(location = 1) in vec3 n;");
 	vertexLines.emplace_back("layout(location = 2) in vec4 col;");
-	/*layout(location = 3) in vec3 uv0;
-	layout(location = 4) in vec3 uv1;
-	layout(location = 5) in vec3 uv2;
-	layout(location = 6) in vec3 uv3;
-	layout(location = 7) in vec3 uv4;
-	layout(location = 8) in vec3 uv5;
-	layout(location = 9) in vec3 uv6;
-	layout(location = 10) in vec3 uv7;
-	*/
 	
-	/*
-	uniform vec4 ambient[10];
-	uniform float ambientSrc[10];
-	uniform vec4 emissive[10];
-	uniform float emissiveSrc[10];
-	uniform vec4 diffuse[10];
-	uniform float diffuseSrc[10];
-	uniform vec4 specular[10];
-	uniform float specularSrc[10];
-	
-	uniform bool invertAlpha[10];
-	
-	uniform vec4 globalAmbient[10];
-	*/
 	vertexLines.emplace_back("uniform mat4 mvp;");
 	vertexLines.emplace_back("uniform mat4 mv;");
 	vertexLines.emplace_back("uniform mat3 normalMatrix;");
 	//uniform int layerCount;
 	
 	vertexLines.emplace_back("uniform mat4 invV;");
-	/*uniform mat4 uvMatrix[10];
-	uniform int uvSource[10];// normal -1, position -2, relect -3, else
-	uniform int useTexture[10];
-	uniform bool clampedTexture[10];
-	uniform bool useReflectionXform[10];
-	uniform bool useRefractionXform[10];*/
 	
 	// Output: tangent space matrix, position in view space and uv.
 	vertexLines.emplace_back("out INTERFACE {");
@@ -145,97 +110,7 @@ std::shared_ptr<ProgramInfos> Age::generateShaders(hsGMaterial * mat){
 	vertexLines.emplace_back("gl_Position = clipPos;");
 	vertexLines.emplace_back("gl_Position.z = gl_Position.z * 2.0 - gl_Position.w;");
 	vertexLines.emplace_back("Out.color = col;");
-		/*
-		for(int i = 0; i < layerCount; ++i){
-			vec4 vertexCol = col;//.bgra;
-			vec4 MAmbient = mix(vertexCol, ambient[i], ambientSrc[i]);
-			vec4 MDiffuse = mix(vertexCol, diffuse[i], diffuseSrc[i]);
-			vec4 MEmissive = mix(vertexCol, emissive[i], emissiveSrc[i]);
-			vec4 MSpecular = mix(vertexCol, specular[i], specularSrc[i]);
-			
-			vec4 LAmbient = vec4(0.0);
-			vec4 LDiffuse = vec4(0.0);
-			
-			//TODO:
-			 //for (size_t i = 0; i < 8; i++) {
-			 //vec3 NDirection = normalize(vec3(worldToLocal*vec4(anor,1.0)));
-			 //LampStruct lamp = uLampSources[i];
-			 
-			 vec3 v2l = vec3(lamp.position - mL2W*vec4(apos,1.0)*lamp.position.w);
-			 float distance = length(v2l);
-			 vec3 direction = normalize(v2l);
-			 float attenuatuin = mix(1.0, 1.0/(lamp.constAtten+lamp.linAtten*distance + lamp.quadAtten * distance * distance), lamp.position.w);
-			 LAmbient = LAmbient + attenuation*(lamp.ambient*lamp.scale);
-			 LDiffuse = LDiffuse + MDiffuse*(lamp.diffuse*lamp.scale)*max(0.0, dot(Ndirection, direction)*attenuation);
-			 
-			 }
-			
-			vec4 ambientFinal = clamp(MAmbient*(globalAmbient[i]+LAmbient), 0.0, 1.0);
-			vec4 diffuseFinal = clamp(LDiffuse, 0.0, 1.0);
-			vec4 material = clamp(ambientFinal + diffuseFinal + MEmissive, 0.0, 1.0);
-			
-			float baseAlpha = invertAlpha[i] ? (1.0 - MDiffuse.a) : MDiffuse.a;
-			
-			Out.color[i] = vec4(material.rgb, baseAlpha);
-			
-			
-			// Compute UV coordinates.
-			if(useTexture[i]>0){
-				mat4 matrix;
-				if (useReflectionXform[i] || useRefractionXform[i]) {
-					matrix = invV;
-					matrix[0][3] = matrix[1][3] = matrix[2][3] = 0.0;
-					
-					float temp = matrix[1][0];
-					matrix[1][0] = matrix[2][0];
-					matrix[2][0] = temp;
-					
-					temp = matrix[1][1];
-					matrix[1][1] = matrix[2][1];
-					matrix[2][1] = temp;
-					
-					temp = matrix[1][2];
-					matrix[1][2] = matrix[2][2];
-					matrix[2][2] = temp;
-					
-					if (useRefractionXform[i]) {
-						matrix[0][2] = -matrix[0][2];
-						matrix[1][2] = -matrix[1][2];
-						matrix[2][2] = -matrix[2][2];
-					}
-				} else {
-					matrix = uvMatrix[i];
-				}
-				
-				
-				vec4 coords;
-				switch (uvSource[i]) {
-					case -1:
-						// Should probably normalize.
-						coords = matrix * Out.camNor;
-						break;
-					case -2:
-						coords = matrix * Out.camPos;
-						break;
-					case -3:
-						coords = matrix * invV * reflect(normalize(Out.camPos), normalize(Out.camNor));
-						break;
-					default:
-						int uvId = uvSource[i];
-						vec3 selectedUV = (uvId == 0 ? uv0 : (uvId == 1 ? uv1 : (uvId == 2 ? uv2 : (uvId == 3 ? uv3 : (uvId == 4 ? uv4 : (uvId == 5 ? uv5 : (uvId == 6 ? uv6 : uv7 )))))));
-						coords = matrix * vec4(selectedUV, 1.0);
-						break;
-				}
-				
-				if(clampedTexture[i]){
-					coords = clamp(coords, 0.0, 1.0);
-				}
-				
-				Out.uv[i] = coords.xyz;
-			}
-		}
-		
-		*/
+	
 	vertexLines.emplace_back("}");
 	
 	// Output: tangent space matrix, position in view space and uv.
@@ -245,165 +120,12 @@ std::shared_ptr<ProgramInfos> Age::generateShaders(hsGMaterial * mat){
 	fragmentLines.emplace_back("	vec4 camNor;");
 	//	fragmentLines.emplace_back("vec3 uv[10];
 	fragmentLines.emplace_back("} In ;");
-	/*uniform int layerCount;
-	
-	
-	uniform int useTexture[10];
-	uniform sampler2D textures[8];
-	uniform samplerCube cubemaps[8];
-	uniform bool blendInvertColor[10];
-	uniform bool blendNoTexColor[10];
-	uniform bool blendInvertAlpha[10];
-	uniform bool blendNoVtxAlpha[10];
-	uniform bool blendNoTexAlpha[10];
-	uniform bool blendAlphaAdd[10];
-	uniform bool blendAlphaMult[10];
-	
-	uniform int blendMode[10]; //1 kBlendAddColorTimesAlpha, 2 kBlendAlpha, 3 kBlendAdd, 4 kBlendMult, 5 kBlendDot3, 6 kBlendAddSigned, 7 kBlendAddSigned2X
-	uniform float alphaThreshold[10];*/
 	
 	
 	fragmentLines.emplace_back("out vec4 fragColor;");
 	
 	fragmentLines.emplace_back("void main(){");
-		//vec3 fCurrColor = vec3(0.0);
-		//vec3 fPrevColor = vec3(0.0);
-		//float fCurrAlpha = 0.0;
-		//float fPrevAlpha = 0.0;
-		/*
-		 // For each layer...
-		 for(int i = 0; i < layerCount; ++i){
-		 float fBaseAlpha = In.color[i].a;
-		 
-		 
-		 
-		 if (useTexture[i]==0) {
-		 // passthrough.
-		 fCurrColor = fPrevColor;
-		 fCurrAlpha = fPrevAlpha;
-		 continue;
-		 }
-		 
-		 
-		 vec4 img = (useTexture[i]==1) ?  texture(textures[i], In.uv[i].xy) : texture(cubemaps[i], In.uv[i].xyz);
-		 
-		 // Local variable to store the color value
-		 
-		 vec3 texCol = blendInvertColor[i] ? (1.0 - img.rgb) : img.rgb;
-		 vec3 col; float alpha;
-		 
-		 
-		 if(i == 0){
-		 if(blendNoTexColor[i]){
-		 fCurrColor = fPrevColor;
-		 } else {
-		 col = texCol;
-		 fCurrColor = col;
-		 }
-		 
-		 float alphaVal = blendInvertAlpha[i] ? (1.0-img.a) : img.a;
-		 if(blendNoVtxAlpha[i] || fPrevAlpha == 0.0){
-		 alpha = alphaVal;
-		 fCurrAlpha = alpha;
-		 } else if(blendNoTexAlpha[i]){
-		 fCurrAlpha = fPrevAlpha;
-		 } else {
-		 alpha = alphaVal * fPrevAlpha;
-		 fCurrAlpha = alpha;
-		 }
-		 } else {
-		 switch (blendMode[i]){
-		 case 1:
-		 // Unsupported on upper layers.
-		 break;
-		 case 2:
-		 if (blendNoTexColor[i]) {
-		 fCurrColor = fPrevColor;
-		 } else {
-		 if (blendInvertAlpha[i]) {
-		 col = texCol + img.a * fPrevColor;
-		 fCurrColor = col;
-		 } else {
-		 col = mix(fPrevColor, texCol, img.a);
-		 fCurrColor = col;
-		 }
-		 }
-		 
-		 float alphaVal = blendInvertAlpha[i] ? (1.0 - img.a) : img.a;
-		 
-		 
-		 if (blendAlphaAdd[i]) {
-		 alpha = alphaVal + fPrevAlpha;
-		 fCurrAlpha = alpha;
-		 } else if (blendAlphaMult[i]) {
-		 alpha = alphaVal * fPrevAlpha;
-		 fCurrAlpha = alpha;
-		 } else {
-		 fCurrAlpha = fPrevAlpha;
-		 }
-		 break;
-		 
-		 case 3:
-		 col = texCol + fPrevColor;
-		 fCurrColor = col;
-		 fCurrAlpha = fPrevAlpha;
-		 break;
-		 case 4:
-		 col = texCol * fPrevColor;
-		 fCurrColor = col;
-		 fCurrAlpha = fPrevAlpha;
-		 break;
-		 case 5:
-		 col = vec3(dot(texCol.rgb, fPrevColor.rgb));
-		 fCurrColor = col;
-		 fCurrAlpha = fPrevAlpha;
-		 break;
-		 case 6:
-		 col = texCol+fPrevColor - 0.5;
-		 fCurrColor = col;
-		 fCurrAlpha = fPrevAlpha;
-		 break;
-		 case 7:
-		 col = 2*(texCol+fPrevColor - 0.5);
-		 fCurrColor = col;
-		 fCurrAlpha = fPrevAlpha;
-		 break;
-		 case 0:
-		 col = texCol;
-		 fCurrColor = col;
-		 alpha = img.a;
-		 fCurrAlpha = alpha;
-		 break;
-		 }
-		 }
-		 
-		 // end of layer loop.
-		 if(fCurrAlpha < alphaThreshold[i]){
-		 continue;
-		 }
-		 
-		 fPrevColor = fCurrColor;
-		 fPrevAlpha = fCurrAlpha;
-		 
-		 }
-		 
-		 
-		 vec3 finalColor;
-		 if(fCurrColor == vec3(0.0)){
-		 finalColor = In.color[layerCount-1].rgb;
-		 } else {
-		 finalColor = In.color[layerCount-1].rgb * fCurrColor;
-		 }
-		 
-		 fragColor = vec4(finalColor, fCurrAlpha);
-		 */
-		
-		
-		//vec4 img = (useTexture[0]==1) ?  texture(textures[0], In.uv[0].xy) : texture(cubemaps[0], normalize(In.uv[0].xyz));
-		
-		// Local variable to store the color value
-		
-		//vec3 texCol = In.color[layerCount-1].rgb*(blendInvertColor[0] ? (1.0 - img.rgb) : img.rgb);
+	
 	fragmentLines.emplace_back("fragColor = In.color;");
 	fragmentLines.emplace_back("}");
 	
@@ -426,6 +148,9 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 	
 	if(scene){
 		int i = 0;
+		
+		
+		Log::Mute();
 		for(const auto & objKey : scene->getSceneObjects()){
 			
 			plSceneObject* obj = plSceneObject::Convert(rm.getObject(objKey));
@@ -474,10 +199,11 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 			}
 			// Swap axis.
 			model = glm::rotate(glm::mat4(1.0f), -float(M_PI_2), glm::vec3(1.0f,0.0f,0.0f)) * model;
-//			++i;
-//			if(i<74){
-//				continue;
-//			}
+			++i;
+			/*if(i!=59 && i!=144){
+				continue;
+			}*/
+			
 			//Log::Info() << objKey->getName() << std::endl;
 			//generateShaders(mat);
 			_objects.emplace_back(new Object(type, Resources::manager().getProgram("object_basic"), model, objKey->getName().to_std_string()));
@@ -499,7 +225,15 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 				if ((di.fFlags & plDISpanIndex::kMatrixOnly) != 0){
 					continue;
 				}
+				
+				Log::Unmute();
+				
+				if(span->getSpan(0)->getFogEnvironment().Exists()){
+					plFogEnvironment* fog = plFogEnvironment::Convert(span->getSpan(0)->getFogEnvironment()->getObj());
 					
+					Log::Info() << fog->getColor() << std::endl;
+				}
+				Log::Mute();
 				for(size_t id = 0; id < di.fIndices.size(); ++id){
 					const std::string fileName = scene->getKey()->getName().to_std_string() + "_" + obj->getKey()->getName().to_std_string() + "_" + std::to_string(i) + "_" + std::to_string(id) ;
 
@@ -508,20 +242,8 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 					const hsMatrix44 transfoMatrix = (bakePosition ? ice->getLocalToWorld() : hsMatrix44::Identity());
 					hsMatrix44 transfoMatrixNormal = transfoMatrix;
 					transfoMatrixNormal.setTranslate(hsVector3(0.0f,0.0f,0.0f));
-					//Log::Info() << (ice->getWorldBounds().getMins()+ice->getWorldBounds().getMaxs())*0.5f << std::endl;
-					//Log::Info() << (ice->getWorldBounds().getCorner()) << std::endl;
-					// if we have to bake the icicle specific position, use it.
-					/*auto refbounds = ice->getWorldBounds();
-					refbounds.updateCenter();
 					
-					hsBounds3Ext bounds;
-					bounds.setType(hsBounds3Ext::kAxisAligned);
-					glm::vec4 resMax = model * glm::vec4(refbounds.getMaxs().X, refbounds.getMaxs().Y, refbounds.getMaxs().Z, 1.0f);
-					glm::vec4 resMin = model * glm::vec4(refbounds.getMins().X, refbounds.getMins().Y, refbounds.getMins().Z, 1.0f);
-					bounds.setMaxs(hsVector3(resMax.x, resMax.y, resMax.z));
-					bounds.setMins(hsVector3(resMin.x, resMin.y, resMin.z));
-					bounds.updateCenter();
-					Log::Info() << bounds.getCenter() << std::endl;*/
+					
 					
 					std::vector<plGBufferVertex> verts = span->getVerts(ice);
 					std::vector<unsigned short> indices = span->getIndices(ice);
@@ -601,6 +323,7 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 					
 						hsGMaterial* mat = hsGMaterial::Convert(matKey->getObj(), false);
 						if (mat != NULL && mat->getLayers().size() > 0) {
+							
 							_maxLayer = std::max(_maxLayer, mat->getLayers().size()-1);
 							Log::Info() << "Material " << mat->getKey()->getName() << std::endl;
 							const unsigned int cflags = mat->getCompFlags();
@@ -625,6 +348,7 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 							Log::Info() << "\tLayers: " <<  mat->getLayers().size() << std::endl;
 							for(size_t lid = 0; lid < mat->getLayers().size(); ++lid){
 								plLayerInterface* lay = plLayerInterface::Convert(mat->getLayers()[lid]->getObj(), false);
+								
 								if(lay->getTexture() != NULL){
 									Log::Info() << "\t\tTexture: " << lay->getTexture()->getName() << ", using UV " << (lay->getUVWSrc() & plLayerInterface::kUVWIdxMask) << " and LOD bias " << lay->getLODBias() << (!lay->getTransform().IsIdentity() ? ", custom" : "") << "." << std::endl;
 									
@@ -785,10 +509,11 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 			}
 			Log::Info() << std::endl;
 		}
-		
+		Log::Unmute();
 	}
-
-	const auto textureKeys = rm.getKeys(ploc, pdUnifiedTypeMap::ClassIndex("plMipmap")); // TODO: also support envmap
+	
+	Log::Mute();
+	const auto textureKeys = rm.getKeys(ploc, pdUnifiedTypeMap::ClassIndex("plMipmap"));
 	Log::Info() << textureKeys.size() << " textures." << std::endl;
 
 	for(const auto & texture : textureKeys){
@@ -811,6 +536,8 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 		Resources::manager().registerCubemap(envmapName, env);
 		_textures.push_back(envmapName);
 	}
+	
+	Log::Unmute();
 	
 }
 
