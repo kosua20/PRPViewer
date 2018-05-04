@@ -3,6 +3,7 @@
 #include "input/Input.hpp"
 #include "helpers/InterfaceUtilities.hpp"
 #include "helpers/Logger.hpp"
+#include <PRP/Surface/hsGMaterial.h>
 #include <glm/gtx/norm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <stdio.h>
@@ -27,6 +28,9 @@ Renderer::Renderer(Config & config) : _config(config) {
 	}
 	Resources::manager().getProgram("object_basic")->registerTexture("textures", 0);
 	Resources::manager().getProgram("object_basic")->registerTexture("cubemaps", 1);
+	Resources::manager().getProgram("object_special")->registerTexture("textures", 0);
+	Resources::manager().getProgram("object_special")->registerTexture("cubemaps", 1);
+	Resources::manager().getProgram("object_special")->registerTexture("textures1", 2);
 	
 	
 	std::vector<std::string> files = ImGui::listFiles("../../../data/mystv/", false, false, {"age"});
@@ -39,17 +43,22 @@ Renderer::Renderer(Config & config) : _config(config) {
 void Renderer::draw(){
 	glViewport(0, 0, GLsizei(_config.screenResolution[0]), GLsizei(_config.screenResolution[1]));
 	glClearColor(0.45f,0.45f, 0.5f, 1.0f);
+	glClearDepth(1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	
 	// FIXME: move to attributes.
 	static int textureId = 0;
 	static bool showTextures = false;
 	static int objectId = 0;
+	static int subObjectId = -1;
+	static int layerId = -1;
+	
 	static bool showObject = false;
 	static bool wireframe = true;
 	static bool doCulling = true;
 	static float cullingDistance = 1500.0f;
 	static int drawCount = 0;
+	
 	if (ImGui::Begin("Infos")) {
 		
 		ImGui::Text("%2.1f FPS (%2.1f ms)", ImGui::GetIO().Framerate, ImGui::GetIO().DeltaTime*1000.0f);
@@ -60,6 +69,10 @@ void Renderer::draw(){
 		}
 		if(showObject){
 			ImGui::Text("Current: %s", _age->objects()[objectId]->getName().c_str());
+			ImGui::Text("%lu subobjects", _age->objects()[objectId]->subObjects().size());
+			if(subObjectId>-1){
+				ImGui::Text("%lu layers", _age->objects()[objectId]->subObjects()[subObjectId].material->getLayers().size());
+			}
 		}
 	}
 	ImGui::End();
@@ -75,6 +88,9 @@ void Renderer::draw(){
 			loadAge(selectedFile);
 			current_item_id = 0;
 			textureId = 0;
+			objectId = 0;
+			subObjectId = -1;
+			layerId = -1;
 			showTextures = false;
 		}
 		
@@ -96,10 +112,24 @@ void Renderer::draw(){
 		ImGui::Checkbox("Culling", &doCulling);
 		ImGui::SliderFloat("Culling dist.", &cullingDistance, 10.0f, 3000.0f);
 		ImGui::Checkbox("Show textures", &showTextures);
-		ImGui::SliderInt("Texture ID", &textureId, 0, _age->textures().size()-1);
-		
+		if(showTextures){
+			if(ImGui::InputInt("Texture ID", &textureId)){
+				objectId = std::min(std::max(textureId,0), (int)_age->textures().size()-1);
+			}
+		}
 		ImGui::Checkbox("Show object", &showObject);
-		ImGui::SliderInt("Object ID", &objectId, 0, _age->objects().size()-1);
+		//ImGui::SliderInt("Object ID", &objectId, 0, _age->objects().size()-1);
+		if(showObject){
+			if(ImGui::InputInt("Object ID", &objectId)){
+				objectId = std::min(std::max(objectId,0), (int)_age->objects().size()-1);
+			}
+			if(ImGui::InputInt("Subobject ID", &subObjectId)){
+				subObjectId = std::min(std::max(subObjectId,-1), (int)_age->objects()[objectId]->subObjects().size()-1);
+			}
+			if(ImGui::InputInt("Layer ID", &layerId)){
+				layerId = std::min(std::max(layerId,-1), (int)_age->objects()[objectId]->subObjects()[subObjectId].material->getLayers().size()-1);
+			}
+		}
 		
 	}
 	ImGui::End();
@@ -116,9 +146,9 @@ void Renderer::draw(){
 		const auto objectToShow = _age->objects()[objectId];
 		
 		if(wireframe){
-			objectToShow->drawDebug(_camera.view() , _camera.projection());
+			objectToShow->drawDebug(_camera.view() , _camera.projection(), subObjectId);
 		} else {
-			objectToShow->draw(_camera.view() , _camera.projection());
+			objectToShow->draw(_camera.view() , _camera.projection(), subObjectId, layerId);
 		}
 		
 	} else {
@@ -157,6 +187,7 @@ void Renderer::draw(){
 	const glm::mat4 MVP = _camera.projection() * _camera.view() * glm::scale(glm::translate(glm::mat4(1.0f), _camera.getCenter()), glm::vec3(0.015f*scale));
 	const auto debugProgram = Resources::manager().getProgram("camera-center");
 	const auto debugObject = Resources::manager().getMesh("sphere");
+	
 	glDisable(GL_BLEND);
 	glEnable(GL_DEPTH_TEST);
 	glDisable(GL_CULL_FACE);

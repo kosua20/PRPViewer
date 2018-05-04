@@ -13,8 +13,6 @@ layout(location = 8) in vec3 uv5;
 layout(location = 9) in vec3 uv6;
 layout(location = 10) in vec3 uv7;
 
-
-
 uniform vec4 ambient;
 uniform float ambientSrc;
 uniform vec4 emissive;
@@ -23,24 +21,30 @@ uniform vec4 diffuse;
 uniform float diffuseSrc;
 uniform vec4 specular;
 uniform float specularSrc;
-
 uniform vec4 globalAmbient;
-
-uniform bool invertVertexAlpha;
 
 uniform mat4 mvp;
 uniform mat4 mv;
 uniform mat3 normalMatrix;
 uniform mat4 invV;
 
+uniform bool invertVertexAlpha;
 uniform bool useReflectionXform;
 uniform bool useRefractionXform;
-
 uniform mat4 uvMatrix;
 uniform int uvSource;// normal -1, position -2, relect -3, else
 uniform int useTexture;
 uniform bvec2 clampedTexture;
+uniform sampler2D textures;
 
+uniform bool invertVertexAlpha1;
+uniform bool useReflectionXform1;
+uniform bool useRefractionXform1;
+uniform mat4 uvMatrix1;
+uniform int uvSource1;
+uniform int useTexture1;
+uniform bvec2 clampedTexture1;
+uniform sampler2D textures1;
 
 // Output: tangent space matrix, position in view space and uv.
 out INTERFACE {
@@ -50,6 +54,57 @@ out INTERFACE {
 	vec3 uv;
 } Out ;
 
+vec3 evaluateUV(mat4 uvMatrixA, int uvSourceA, bvec2 clampedTextureA, bool useReflectionXformA, bool useRefractionXformA){
+	mat4 matrix;
+	if (useReflectionXformA || useRefractionXformA) {
+		matrix = invV;
+		matrix[0][3] = matrix[1][3] = matrix[2][3] = 0.0;
+		
+		float temp = matrix[1][0];
+		matrix[1][0] = matrix[2][0];
+		matrix[2][0] = temp;
+		
+		temp = matrix[1][1];
+		matrix[1][1] = matrix[2][1];
+		matrix[2][1] = temp;
+		
+		temp = matrix[1][2];
+		matrix[1][2] = matrix[2][2];
+		matrix[2][2] = temp;
+		
+		if (useRefractionXform) {
+			matrix[0][2] = -matrix[0][2];
+			matrix[1][2] = -matrix[1][2];
+			matrix[2][2] = -matrix[2][2];
+		}
+	} else {
+		matrix = uvMatrixA;
+	}
+	
+	
+	vec4 coords;
+	switch (uvSourceA) {
+		case -1:
+			// Should probably normalize.
+			coords = matrix * Out.camNor;
+			break;
+		case -2:
+			coords = matrix * Out.camPos;
+			break;
+		case -3:
+			coords = matrix * invV * reflect(normalize(Out.camPos), normalize(Out.camNor));
+			break;
+		default:
+			int uvId = uvSourceA;
+			vec3 selectedUV = (uvId == 0 ? uv0 : (uvId == 1 ? uv1 : (uvId == 2 ? uv2 : (uvId == 3 ? uv3 : (uvId == 4 ? uv4 : (uvId == 5 ? uv5 : (uvId == 6 ? uv6 : uv7 )))))));
+			coords = matrix * vec4(selectedUV, 1.0);
+			break;
+	}
+	
+	coords.x = clampedTextureA.x ? clamp(coords.x, 0.0, 1.0) : coords.x;
+	coords.y = clampedTextureA.y ? clamp(coords.y, 0.0, 1.0) : coords.y;
+	return coords.xyz;
+}
 
 void main(){
 	
@@ -84,78 +139,22 @@ void main(){
 		LDiffuse = LDiffuse + MDiffuse*(lamp.diffuse*lamp.scale)*max(0.0, dot(Ndirection, direction)*attenuation);
 	 
 	}*/
-	
-	vec3 NDirection = normalize(Out.camNor.xyz);
-	vec3 v2l = vec3(1.0,1.0,1.0);
-	vec3 direction = normalize(v2l);
-	
-	//LAmbient = LAmbient + 0.1;
-	//LDiffuse = LDiffuse + MDiffuse*max(0.0, dot(NDirection, direction));
-	
-	
 		
 	vec4 ambientFinal = clamp(MAmbient*(globalAmbient+LAmbient), 0.0, 1.0);
 	vec4 diffuseFinal = clamp(LDiffuse, 0.0, 1.0);
 	vec4 material = clamp(ambientFinal + diffuseFinal + MEmissive, 0.0, 1.0);
 		
 	float baseAlpha = invertVertexAlpha ? (1.0 - MDiffuse.a) : MDiffuse.a;
-		
-	Out.color = vec4(material.rgb, baseAlpha);
+	
+	vec3 uvsAlpha = evaluateUV(uvMatrix1, uvSource1, clampedTexture1, useReflectionXform1, useRefractionXform1);
+	float alphaTex = texture(textures1, uvsAlpha.xy).r;
+	alphaTex = invertVertexAlpha1 ? (1.0 - alphaTex) : alphaTex;
+	Out.color = vec4(material.rgb, baseAlpha*alphaTex);
 		
 		
 	// Compute UV coordinates.
 	if(useTexture>0){
-		mat4 matrix;
-		if (useReflectionXform || useRefractionXform) {
-			matrix = invV;
-			matrix[0][3] = matrix[1][3] = matrix[2][3] = 0.0;
-			
-			float temp = matrix[1][0];
-			matrix[1][0] = matrix[2][0];
-			matrix[2][0] = temp;
-			
-			temp = matrix[1][1];
-			matrix[1][1] = matrix[2][1];
-			matrix[2][1] = temp;
-			
-			temp = matrix[1][2];
-			matrix[1][2] = matrix[2][2];
-			matrix[2][2] = temp;
-			
-			if (useRefractionXform) {
-				matrix[0][2] = -matrix[0][2];
-				matrix[1][2] = -matrix[1][2];
-				matrix[2][2] = -matrix[2][2];
-			}
-		} else {
-			matrix = uvMatrix;
-		}
-			
-			
-		vec4 coords;
-		switch (uvSource) {
-			case -1:
-				// Should probably normalize.
-				coords = matrix * Out.camNor;
-				break;
-			case -2:
-				coords = matrix * Out.camPos;
-				break;
-			case -3:
-				coords = matrix * invV * reflect(normalize(Out.camPos), normalize(Out.camNor));
-				break;
-			default:
-				int uvId = uvSource;
-				vec3 selectedUV = (uvId == 0 ? uv0 : (uvId == 1 ? uv1 : (uvId == 2 ? uv2 : (uvId == 3 ? uv3 : (uvId == 4 ? uv4 : (uvId == 5 ? uv5 : (uvId == 6 ? uv6 : uv7 )))))));
-				coords = matrix * vec4(selectedUV, 1.0);
-				break;
-		}
-			
-		coords.x = clampedTexture.x ? clamp(coords.x, 0.0, 1.0) : coords.x;
-		coords.y = clampedTexture.y ? clamp(coords.y, 0.0, 1.0) : coords.y;
-		
-			
-		Out.uv = coords.xyz;
+		Out.uv = evaluateUV(uvMatrix, uvSource, clampedTexture, useReflectionXform, useRefractionXform);
 	} else {
 		Out.uv = vec3(0.0);
 	}

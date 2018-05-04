@@ -39,7 +39,7 @@ void main(){
 		fCurrAlpha = In.color.a;
 	} else {
 		
-		vec4 img = (useTexture==1) ?  texture(textures, In.uv.xy) : texture(cubemaps, normalize(In.uv.xyz));
+		vec4 img = (useTexture==1) ?  texture(textures, In.uv.xy) : texture(cubemaps, In.uv.xyz);
 		vec3 texColor = blendInvertColor ? (1.0 - img.rgb) : img.rgb;
 		float texAlpha = blendInvertAlpha ? (1.0 - img.a) : img.a;
 		// Vertex alpha inversion is handled in the vertex shader.
