@@ -133,24 +133,37 @@ void Object::draw(const glm::mat4& view, const glm::mat4& projection, const int 
 		if(!subObject.material){
 			continue;
 		}
+		if(subObject.material->getLayers().size() == 1 && !plLayerInterface::Convert(subObject.material->getLayers()[0]->getObj(), false)->getTexture().Exists()){
+			continue;
+		}
+		   
 		// Transparent object: layer  has non unit opacity + blend.
 		for(size_t tid = 0; tid < subObject.material->getLayers().size(); tid++){
 			
-			const auto & layKey = subObject.material->getLayers()[tid];
+			
 			if(layerId > -1 && tid > layerId){
 				continue;
 			}
-			
+			const auto & layKey = subObject.material->getLayers()[tid];
 			// Obtain the layer to aply.
 			plLayerInterface * lay = plLayerInterface::Convert(layKey->getObj(), false);
-			// If this layer is misc 33792 and the next is blend 147458, use special shader.
 			
-			//if(lay->getUnderLay().Exists()){
-				//Log::Info() << "Underlay: " << lay->getUnderLay()->getName() << std::endl;
-				//plLayerInterface * underlay = plLayerInterface::Convert(lay->getUnderLay()->getObj(), false);
-				//renderLayer(subObject, underlay, tid);
-				//++tid;
-			//}
+			// If this layer is a bump layer, skip for now. TODO: add support for bump maps.
+			if((lay->getState().fMiscFlags & (hsGMatState::kMiscBumpDu | hsGMatState::kMiscBumpDv | hsGMatState::kMiscBumpDw | hsGMatState::kMiscBumpLayer | hsGMatState::kMiscBumpChans)) != 0){
+				continue;
+			}
+			// Fix for non texture null state layers.
+			if(!lay->getTexture().Exists() && lay->getState().fMiscFlags == 0 && lay->getState().fBlendFlags == 0 && lay->getState().fZFlags == 0 && lay->getState().fShadeFlags == 0){
+				
+				if(lay->getUnderLay().Exists()){
+					//Log::Info() << "Underlay: " << lay->getUnderLay()->getName() << std::endl;
+					plLayerInterface * underlay = plLayerInterface::Convert(lay->getUnderLay()->getObj(), false);
+					renderLayer(subObject, underlay, tid);
+					//++tid;
+				}
+				continue;
+			}
+			
 			// TODO: cache this at laod time.
 			if(tid < subObject.material->getLayers().size()-1){
 				
