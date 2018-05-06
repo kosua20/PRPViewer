@@ -101,8 +101,8 @@ vec3 evaluateUV(mat4 uvMatrixA, int uvSourceA, bvec2 clampedTextureA, bool useRe
 			break;
 	}
 	
-	coords.x = clampedTextureA.x ? clamp(coords.x, 0.0, 1.0) : coords.x;
-	coords.y = clampedTextureA.y ? clamp(coords.y, 0.0, 1.0) : coords.y;
+	coords.x = clampedTextureA.x ? clamp(coords.x, 0.01, 0.99) : coords.x;
+	coords.y = clampedTextureA.y ? clamp(coords.y, 0.01, 0.99) : coords.y;
 	return coords.xyz;
 }
 
@@ -147,7 +147,7 @@ void main(){
 	float baseAlpha = invertVertexAlpha ? (1.0 - MDiffuse.a) : MDiffuse.a;
 	
 	vec3 uvsAlpha = evaluateUV(uvMatrix1, uvSource1, clampedTexture1, useReflectionXform1, useRefractionXform1);
-	float alphaTex = texture(textures1, uvsAlpha.xy).r;
+	float alphaTex = texture(textures1, uvsAlpha.xy).a;
 	alphaTex = invertVertexAlpha1 ? (1.0 - alphaTex) : alphaTex;
 	Out.color = vec4(material.rgb, baseAlpha*alphaTex);
 		
