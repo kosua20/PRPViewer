@@ -54,6 +54,7 @@ void Renderer::draw(){
 	static int layerId = -1;
 	
 	static bool showObject = false;
+	static bool showList = false;
 	static bool wireframe = true;
 	static bool doCulling = true;
 	static float cullingDistance = 1500.0f;
@@ -107,27 +108,15 @@ void Renderer::draw(){
 			
 		}
 		
-		
 		ImGui::Checkbox("Wireframe", &wireframe);
+		ImGui::SameLine();
 		ImGui::Checkbox("Culling", &doCulling);
 		ImGui::SliderFloat("Culling dist.", &cullingDistance, 10.0f, 3000.0f);
 		ImGui::Checkbox("Show textures", &showTextures);
+		
 		if(showTextures){
 			if(ImGui::InputInt("Texture ID", &textureId)){
 				objectId = std::min(std::max(textureId,0), (int)_age->textures().size()-1);
-			}
-		}
-		ImGui::Checkbox("Show object", &showObject);
-		//ImGui::SliderInt("Object ID", &objectId, 0, _age->objects().size()-1);
-		if(showObject){
-			if(ImGui::InputInt("Object ID", &objectId)){
-				objectId = std::min(std::max(objectId,0), (int)_age->objects().size()-1);
-			}
-			if(ImGui::InputInt("Subobject ID", &subObjectId)){
-				subObjectId = std::min(std::max(subObjectId,-1), (int)_age->objects()[objectId]->subObjects().size()-1);
-			}
-			if(ImGui::InputInt("Layer ID", &layerId)){
-				layerId = std::min(std::max(layerId,-1), (int)_age->objects()[objectId]->subObjects()[subObjectId].material->getLayers().size()-1);
 			}
 		}
 		
@@ -135,6 +124,54 @@ void Renderer::draw(){
 	ImGui::End();
 	Log::Info().display();
 	
+	
+	if(ImGui::Begin("Listing")){
+		
+		if(ImGui::Button("All")){
+			for(auto & object : _age->objects()){
+				object->enabled = true;
+			}
+		}
+		ImGui::SameLine();
+		if(ImGui::Button("None")){
+			for(auto & object : _age->objects()){
+				object->enabled = false;
+			}
+		}
+		ImGui::BeginChild("List");
+		for(auto & object : _age->objects()){
+			ImGui::Selectable(object->getName().c_str(), &object->enabled);
+		}
+		ImGui::EndChild();
+	}
+	ImGui::End();
+	
+	bool firstObjectEnabled = true;
+	showObject = false;
+	for(size_t oid = 0; oid < _age->objects().size(); ++oid){
+		if(_age->objects()[oid]->enabled){
+			if(!firstObjectEnabled){
+				showObject = false;
+				break;
+			}
+			firstObjectEnabled = false;
+			objectId = oid;
+			showObject = true;
+		}
+	}
+	if(showObject){
+		if (ImGui::Begin("Settings")) {
+			if(ImGui::InputInt("Subobject ID", &subObjectId)){
+				subObjectId = std::min(std::max(subObjectId,-1), (int)_age->objects()[objectId]->subObjects().size()-1);
+			}
+			if(ImGui::InputInt("Layer ID", &layerId)){
+				layerId = std::min(std::max(layerId,-1), (int)_age->objects()[objectId]->subObjects()[subObjectId].material->getLayers().size()-1);
+			}
+		}
+		ImGui::End();
+	}
+	
+	//ImGui::ShowTestWindow();
 	if(showTextures){
 		_quad.draw(Resources::manager().getTexture(_age->textures()[textureId]).id);
 		return;
@@ -165,8 +202,10 @@ void Renderer::draw(){
 			return leftDist > rightDist;
 			
 		});*/
-		
 		for(const auto & object : objects){
+			if(!object->enabled){
+				continue;
+			}
 			if(doCulling &&
 			   (glm::length2(object->getCenter() - _camera.getPosition()) > cullingDistance*cullingDistance ||
 				// !object->isVisible(_camera.getPosition(), _camera.getDirection()) || (

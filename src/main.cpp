@@ -21,6 +21,8 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 	if(!ImGui::GetIO().WantCaptureKeyboard){
 		Input::manager().keyPressedEvent(key, action);
 	}
+	ImGui_ImplGlfw_KeyCallback(window, key, scancode, action, mods);
+	
 }
 
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods){
@@ -40,6 +42,7 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset){
 	if(!ImGui::GetIO().WantCaptureMouse){
 		Input::manager().mouseScrolledEvent(xoffset, yoffset);
 	}
+	ImGui_ImplGlfw_ScrollCallback(window, xoffset, yoffset);
 }
 
 void joystick_callback(int joy, int event){
@@ -109,6 +112,7 @@ int main(int argc, char** argv) {
 	glfwSetCursorPosCallback(window,cursor_pos_callback);		// Moving the cursor
 	glfwSetScrollCallback(window,scroll_callback);				// Scrolling
 	glfwSetJoystickCallback(joystick_callback);					// Joystick
+	glfwSetCharCallback(window, ImGui_ImplGlfw_CharCallback);
 	glfwSwapInterval(config.vsync ? 1 : 0);						// 60 FPS V-sync
 	
 	// Check the window size (if we are on a screen smaller than the initial size.
