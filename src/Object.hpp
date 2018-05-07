@@ -54,6 +54,8 @@ public:
 	
 	const std::vector<SubObject> & subObjects(){ return _subObjects; }
 	
+	bool enabled;
+	
 private:
 	
 	void renderLayer(const SubObject & subObject, plLayerInterface * lay, const int tid) const;

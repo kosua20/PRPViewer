@@ -12,6 +12,7 @@ Object::Object(const Type & type, std::shared_ptr<ProgramInfos> prog, const glm:
 	_type = type;
 	_model = glm::mat4(model);
 	_name = name;
+	enabled = true;
 }
 
 Object::~Object() {}
@@ -125,6 +126,10 @@ void Object::draw(const glm::mat4& view, const glm::mat4& projection, const int 
 	
 	int sid = -1;
 	for(const auto & subObject : _subObjects){
+		
+		glPolygonOffset(0.0f, 0.0f);
+		glDisable(GL_POLYGON_OFFSET_FILL);
+		
 		++sid;
 		if(subObjId > -1 && sid != subObjId){
 			continue;
@@ -216,8 +221,7 @@ void Object::resetState() const {
 	glDepthFunc(GL_LEQUAL);
 	glEnable(GL_CULL_FACE);
 	glEnable(GL_DEPTH_TEST);
-	glPolygonOffset(0.0f, 0.0f);
-	glDisable(GL_POLYGON_OFFSET_FILL);
+	
 	if(_type == Billboard || _type == BillboardY){
 		glDisable(GL_CULL_FACE);
 	}
