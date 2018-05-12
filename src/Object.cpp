@@ -440,12 +440,10 @@ void Object::textureState(const std::shared_ptr<ProgramInfos> & program, plLayer
 			glActiveTexture(GL_TEXTURE0+1);
 			glBindTexture(GL_TEXTURE_CUBE_MAP, infos.id);
 			glUniform1i(program->uniform("useTexture"), 2);
-			glTexParameterf(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_LOD_BIAS, lay->getLODBias());
 		} else {
 			glActiveTexture(GL_TEXTURE0+0);
 			glBindTexture(GL_TEXTURE_2D, infos.id);
 			glUniform1i(program->uniform("useTexture"), 1);
-			glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_LOD_BIAS, lay->getLODBias());
 		}
 		if(lay->getUVWSrc() == plLayer::kUVWNormal){
 			glUniform1i(program->uniform("uvSource"), -1);
@@ -457,6 +455,11 @@ void Object::textureState(const std::shared_ptr<ProgramInfos> & program, plLayer
 			glUniform1i(program->uniform("uvSource"), lay->getUVWSrc() & plLayer::kUVWIdxMask);
 		}
 		
+		if(lay->getState().fZFlags & hsGMatState::kZLODBias){
+			glTexParameterf(infos.cubemap ? GL_TEXTURE_CUBE_MAP : GL_TEXTURE_2D, GL_TEXTURE_LOD_BIAS, lay->getLODBias());
+		} else {
+			glTexParameterf(infos.cubemap ? GL_TEXTURE_CUBE_MAP : GL_TEXTURE_2D, GL_TEXTURE_LOD_BIAS, 0.0f);
+		}
 		
 	} else {
 		//infos = Resources::manager().getTexture("");
@@ -464,6 +467,8 @@ void Object::textureState(const std::shared_ptr<ProgramInfos> & program, plLayer
 		glBindTexture(GL_TEXTURE_2D, 0);
 		glUniform1i(program->uniform("useTexture"), 0);
 	}
+	
+	
 	glUniform2i(program->uniform("clampedTexture"), lay->getState().fClampFlags & hsGMatState::kClampTextureU ? 1 : 0, lay->getState().fClampFlags & hsGMatState::kClampTextureV ? 1 : 0);
 	glUniform1i(program->uniform("useReflectionXform"), lay->getState().fMiscFlags &  hsGMatState::kMiscUseReflectionXform ? 1 : 0);
 	glUniform1i(program->uniform("useRefractionXform"), lay->getState().fMiscFlags &  hsGMatState::kMiscUseRefractionXform ? 1 : 0);
@@ -481,7 +486,6 @@ void Object::textureStateCustom(const std::shared_ptr<ProgramInfos> & program, p
 			glActiveTexture(GL_TEXTURE0+2);
 			glBindTexture(GL_TEXTURE_2D, infos.id);
 			glUniform1i(program->uniform("useTexture1"), 1);
-			glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_LOD_BIAS, lay->getLODBias());
 		}
 		if(lay->getUVWSrc() == plLayer::kUVWNormal){
 			glUniform1i(program->uniform("uvSource1"), -1);
@@ -492,7 +496,11 @@ void Object::textureStateCustom(const std::shared_ptr<ProgramInfos> & program, p
 		} else {
 			glUniform1i(program->uniform("uvSource1"), lay->getUVWSrc() & plLayer::kUVWIdxMask);
 		}
-		
+		if(lay->getState().fZFlags & hsGMatState::kZLODBias){
+			glTexParameterf(infos.cubemap ? GL_TEXTURE_CUBE_MAP : GL_TEXTURE_2D, GL_TEXTURE_LOD_BIAS, lay->getLODBias());
+		} else {
+			glTexParameterf(infos.cubemap ? GL_TEXTURE_CUBE_MAP : GL_TEXTURE_2D, GL_TEXTURE_LOD_BIAS, 0.0f);
+		}
 	} else {
 		//infos = Resources::manager().getTexture("");
 		glActiveTexture(GL_TEXTURE0);
