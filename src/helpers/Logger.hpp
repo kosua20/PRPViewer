@@ -10,6 +10,9 @@
 #include <Math/hsGeometry3.h>
 #include <Math/hsMatrix44.h>
 #include <Sys/hsColor.h>
+#include <PRP/Surface/plLayerInterface.h>
+
+std::string logLayer(plLayerInterface * lay);
 
 // Fix for Windows headers.
 #ifdef ERROR

@@ -3,6 +3,139 @@
 #include <ctime>
 #include <iomanip>
 #include <iostream>
+
+
+std::string logLayer(plLayerInterface * lay){
+	std::string layerString;
+	if(lay->getTexture() != NULL){
+		layerString.append("Texture: " + lay->getTexture()->getName().to_std_string() + ", LOD bias " + std::to_string(lay->getLODBias()) + ").\n");
+	}
+	
+//	layerString.append("Opacity: " + lay->getOpacity() + ", ");
+//	"Power: " + lay->getSpecularPower() + ", ";
+//	std::endl;
+//	"Amb: " + lay->getAmbient() <<", ";
+//	"Pres: " + lay->getPreshade() <<", ";
+//	"Spec: " + lay->getSpecular() <<", ";
+//	"Run: " + lay->getRuntime() <<", ";
+//	layerString.append(std::endl;
+	
+	const unsigned int fblend = lay->getState().fBlendFlags;
+	const unsigned int fclamp = lay->getState().fClampFlags;
+	const unsigned int fmisc = lay->getState().fMiscFlags;
+	const unsigned int fshade = lay->getState().fShadeFlags;
+	const unsigned int fz = lay->getState().fZFlags;
+	
+	if(fblend != 0){
+		layerString.append("Blend: ");
+		if(fblend & hsGMatState::kBlendTest){ layerString.append("kBlendTest, "); }
+		if(fblend & hsGMatState::kBlendAlpha){ layerString.append("kBlendAlpha, "); }
+		if(fblend & hsGMatState::kBlendMult){ layerString.append("kBlendMult, "); }
+		if(fblend & hsGMatState::kBlendAdd){ layerString.append("kBlendAdd, "); }
+		if(fblend & hsGMatState::kBlendAddColorTimesAlpha){ layerString.append("kBlendAddColorTimesAlpha, "); }
+		if(fblend & hsGMatState::kBlendAntiAlias){ layerString.append("kBlendAntiAlias, "); }
+		if(fblend & hsGMatState::kBlendDetail){ layerString.append("kBlendDetail, "); }
+		if(fblend & hsGMatState::kBlendNoColor){ layerString.append("kBlendNoColor, "); }
+		if(fblend & hsGMatState::kBlendMADD){ layerString.append("kBlendMADD, "); }
+		if(fblend & hsGMatState::kBlendDot3){ layerString.append("kBlendDot3, "); }
+		if(fblend & hsGMatState::kBlendAddSigned){ layerString.append("kBlendAddSigned, "); }
+		if(fblend & hsGMatState::kBlendAddSigned2X){ layerString.append("kBlendAddSigned2X, "); }
+		//if(fblend & kBlendMask){ layerString.append("kBlendMask, "); }
+		if(fblend & hsGMatState::kBlendInvertAlpha){ layerString.append("kBlendInvertAlpha, "); }
+		if(fblend & hsGMatState::kBlendInvertColor){ layerString.append("kBlendInvertColor, "); }
+		if(fblend & hsGMatState::kBlendAlphaMult){ layerString.append("kBlendAlphaMult, "); }
+		if(fblend & hsGMatState::kBlendAlphaAdd){ layerString.append("kBlendAlphaAdd, "); }
+		if(fblend & hsGMatState::kBlendNoVtxAlpha){ layerString.append("kBlendNoVtxAlpha, "); }
+		if(fblend & hsGMatState::kBlendNoTexColor){ layerString.append("kBlendNoTexColor, "); }
+		if(fblend & hsGMatState::kBlendNoTexAlpha){ layerString.append("kBlendNoTexAlpha, "); }
+		if(fblend & hsGMatState::kBlendInvertVtxAlpha){ layerString.append("kBlendInvertVtxAlpha, "); }
+		if(fblend & hsGMatState::kBlendAlphaAlways){ layerString.append("kBlendAlphaAlways, "); }
+		if(fblend & hsGMatState::kBlendInvertFinalColor){ layerString.append("kBlendInvertFinalColor, "); }
+		if(fblend & hsGMatState::kBlendInvertFinalAlpha){ layerString.append("kBlendInvertFinalAlpha, "); }
+		if(fblend & hsGMatState::kBlendEnvBumpNext){ layerString.append("kBlendEnvBumpNext, "); }
+		if(fblend & hsGMatState::kBlendSubtract){ layerString.append("kBlendSubtract, "); }
+		if(fblend & hsGMatState::kBlendRevSubtract){ layerString.append("kBlendRevSubtract, "); }
+		if(fblend & hsGMatState::kBlendAlphaTestHigh){ layerString.append("kBlendAlphaTestHigh, "); }
+		layerString.append("\n");
+	}
+	if(fclamp!=0){
+		layerString.append("Clamp: ");
+		if(fclamp == hsGMatState::kClampTextureU){ layerString.append("kClampTextureU, "); }
+		if(fclamp == hsGMatState::kClampTextureV){ layerString.append("kClampTextureV, "); }
+		if(fclamp == hsGMatState::kClampTexture){ layerString.append("kClampTexture, "); }
+		layerString.append("\n");
+	}
+	
+	if(fmisc!=0){
+		layerString.append("Misc: ");
+		if(fmisc & hsGMatState::kMiscWireFrame){ layerString.append("kMiscWireFrame, "); }
+		if(fmisc & hsGMatState::kMiscDrawMeshOutlines){ layerString.append("kMiscDrawMeshOutlines, "); }
+		if(fmisc & hsGMatState::kMiscTwoSided){ layerString.append("kMiscTwoSided, "); }
+		if(fmisc & hsGMatState::kMiscDrawAsSplats){ layerString.append("kMiscDrawAsSplats, "); }
+		if(fmisc & hsGMatState::kMiscAdjustPlane){ layerString.append("kMiscAdjustPlane, "); }
+		if(fmisc & hsGMatState::kMiscAdjustCylinder){ layerString.append("kMiscAdjustCylinder, "); }
+		if(fmisc & hsGMatState::kMiscAdjustSphere){ layerString.append("kMiscAdjustSphere, "); }
+		//if(fmisc & kMiscAdjust){ layerString.append("kMiscAdjust, "); }
+		if(fmisc & hsGMatState::kMiscTroubledLoner){ layerString.append("kMiscTroubledLoner, "); }
+		if(fmisc & hsGMatState::kMiscBindSkip){ layerString.append("kMiscBindSkip, "); }
+		if(fmisc & hsGMatState::kMiscBindMask){ layerString.append("kMiscBindMask, "); }
+		if(fmisc & hsGMatState::kMiscBindNext){ layerString.append("kMiscBindNext, "); }
+		if(fmisc & hsGMatState::kMiscLightMap){ layerString.append("kMiscLightMap, "); }
+		if(fmisc & hsGMatState::kMiscUseReflectionXform){ layerString.append("kMiscUseReflectionXform, "); }
+		if(fmisc & hsGMatState::kMiscPerspProjection){ layerString.append("kMiscPerspProjection, "); }
+		if(fmisc & hsGMatState::kMiscOrthoProjection){ layerString.append("kMiscOrthoProjection, "); }
+		//if(fmisc & kMiscProjection){ layerString.append("kMiscProjection, "); }
+		if(fmisc & hsGMatState::kMiscRestartPassHere){ layerString.append("kMiscRestartPassHere, "); }
+		if(fmisc & hsGMatState::kMiscBumpLayer){ layerString.append("kMiscBumpLayer, "); }
+		if(fmisc & hsGMatState::kMiscBumpDu){ layerString.append("kMiscBumpDu, "); }
+		if(fmisc & hsGMatState::kMiscBumpDv){ layerString.append("kMiscBumpDv, "); }
+		if(fmisc & hsGMatState::kMiscBumpDw){ layerString.append("kMiscBumpDw, "); }
+		//if(fmisc & kMiscBumpChans){ layerString.append("kMiscBumpChans, "); }
+		if(fmisc & hsGMatState::kMiscNoShadowAlpha){ layerString.append("kMiscNoShadowAlpha, "); }
+		if(fmisc & hsGMatState::kMiscUseRefractionXform){ layerString.append("kMiscUseRefractionXform, "); }
+		if(fmisc & hsGMatState::kMiscCam2Screen){ layerString.append("kMiscCam2Screen, "); }
+		//if(fmisc & hsGMatState::kAllMiscFlags){ layerString.append("kAllMiscFlags, "); }
+		layerString.append("\n");
+	}
+	
+	if(fshade!=0){
+		layerString.append("Shade: ");
+		if(fshade & hsGMatState::kShadeSoftShadow){ layerString.append("kShadeSoftShadow, "); }
+		if(fshade & hsGMatState::kShadeNoProjectors){ layerString.append("kShadeNoProjectors, "); }
+		if(fshade & hsGMatState::kShadeEnvironMap){ layerString.append("kShadeEnvironMap, "); }
+		if(fshade & hsGMatState::kShadeVertexShade){ layerString.append("kShadeVertexShade, "); }
+		if(fshade & hsGMatState::kShadeNoShade){ layerString.append("kShadeNoShade, "); }
+		if(fshade & hsGMatState::kShadeBlack){ layerString.append("kShadeBlack, "); }
+		if(fshade & hsGMatState::kShadeSpecular){ layerString.append("kShadeSpecular, "); }
+		if(fshade & hsGMatState::kShadeNoFog){ layerString.append("kShadeNoFog, "); }
+		if(fshade & hsGMatState::kShadeWhite){ layerString.append("kShadeWhite, "); }
+		if(fshade & hsGMatState::kShadeSpecularAlpha){ layerString.append("kShadeSpecularAlpha, "); }
+		if(fshade & hsGMatState::kShadeSpecularColor){ layerString.append("kShadeSpecularColor, "); }
+		if(fshade & hsGMatState::kShadeSpecularHighlight){ layerString.append("kShadeSpecularHighlight, "); }
+		if(fshade & hsGMatState::kShadeVertColShade){ layerString.append("kShadeVertColShade, "); }
+		if(fshade & hsGMatState::kShadeInherit){ layerString.append("kShadeInherit, "); }
+		if(fshade & hsGMatState::kShadeIgnoreVtxIllum){ layerString.append("kShadeIgnoreVtxIllum, "); }
+		if(fshade & hsGMatState::kShadeEmissive){ layerString.append("kShadeEmissive, "); }
+		if(fshade & hsGMatState::kShadeReallyNoFog){ layerString.append("kShadeReallyNoFog, "); }
+		layerString.append("\n");
+	}
+	if(fz != 0){
+		layerString.append("Depth: ");
+		if(fz & hsGMatState::kZIncLayer){ layerString.append("kZIncLayer, "); }
+		if(fz & hsGMatState::kZClearZ){ layerString.append("kZClearZ, "); }
+		if(fz & hsGMatState::kZNoZRead){ layerString.append("kZNoZRead, "); }
+		if(fz & hsGMatState::kZNoZWrite){ layerString.append("kZNoZWrite, "); }
+		//if(fz & kZMask){ layerString.append("kZMask, "); }
+		if(fz & hsGMatState::kZLODBias){ layerString.append("kZLODBias, "); }
+		layerString.append("\n");
+	}
+	
+	if(lay->getUnderLay().Exists()){
+		layerString.append("Underlay: " + lay->getUnderLay()->getName().to_std_string() + "\n");
+	}
+	return layerString;
+}
+
 // We statically initialize the default logger.
 // We don't really care about its exact construction/destruction moments,
 // but we want it to always be created.
