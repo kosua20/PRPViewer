@@ -57,6 +57,7 @@ void Renderer::draw(){
 	static bool showList = false;
 	static bool wireframe = true;
 	static bool doCulling = true;
+	static bool multipleSelection = false;
 	static float cullingDistance = 1500.0f;
 	static int drawCount = 0;
 	
@@ -124,7 +125,6 @@ void Renderer::draw(){
 	ImGui::End();
 	Log::Info().display();
 	
-	
 	if(ImGui::Begin("Listing")){
 		
 		if(ImGui::Button("All")){
@@ -138,9 +138,71 @@ void Renderer::draw(){
 				object->enabled = false;
 			}
 		}
-		ImGui::BeginChild("List");
-		for(auto & object : _age->objects()){
-			ImGui::Selectable(object->getName().c_str(), &object->enabled);
+		ImGui::SameLine();
+		if(ImGui::Checkbox("Multiple", &multipleSelection)){
+			if(!multipleSelection){
+				// Disable all but one element.
+				bool first = true;
+				for(size_t oid = 0; oid < _age->objects().size(); ++oid){
+					if(first && _age->objects()[oid]->enabled){
+						first = false;
+						continue;
+					}
+					_age->objects()[oid]->enabled = false;
+				}
+			}
+		}
+		
+		ImGui::BeginChild("List", ImVec2(0,500), true);
+		for(size_t oid = 0; oid < _age->objects().size(); ++oid){
+			auto & object = _age->objects()[oid];
+			
+			if(ImGui::Selectable(object->getName().c_str(), &object->enabled)){
+				if(!multipleSelection){
+					// Disable all other elements.
+					for(size_t doid = 0; doid < oid; ++doid){
+						_age->objects()[doid]->enabled = false;
+					}
+					object->enabled = true;
+					for(size_t doid = oid+1; doid < _age->objects().size(); ++doid){
+						_age->objects()[doid]->enabled = false;
+					}
+				}
+			}
+		}
+		ImGui::EndChild();
+		
+		ImGui::BeginChild("Details");
+		if(showObject){
+			const auto & obj = _age->objects()[objectId];
+			const ImGuiTreeNodeFlags parentFlags = 0 ;
+			const ImGuiTreeNodeFlags leafFlags = ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
+			
+			for(int soid = 0; soid < obj->subObjects().size(); ++soid){
+				const auto & subobj = obj->subObjects()[soid];
+				if(ImGui::TreeNodeEx((void*)(intptr_t)soid, parentFlags, "Subobject %i", soid)){
+					for(const auto & layer : subobj.material->getLayers()){
+						if(ImGui::TreeNodeEx(layer->getName().c_str(), parentFlags, "%s", layer->getName().c_str())){
+							
+							plLayerInterface * lay = plLayerInterface::Convert(layer->getObj());
+							const std::string logString = logLayer(lay);
+							//ImGui::TreeNodeEx(logString.c_str(), leafFlags);
+							ImGui::TextWrapped("%s", logString.c_str());
+							
+							ImGui::TreePop();
+						}
+						
+					}
+					ImGui::TreePop();
+				}
+			}
+			if(ImGui::InputInt("Subobject ID", &subObjectId)){
+				subObjectId = std::min(std::max(subObjectId,-1), (int)_age->objects()[objectId]->subObjects().size()-1);
+			}
+			if(ImGui::InputInt("Layer ID", &layerId)){
+				layerId = std::min(std::max(layerId,-1), (int)_age->objects()[objectId]->subObjects()[subObjectId].material->getLayers().size()-1);
+			}
+			
 		}
 		ImGui::EndChild();
 	}
@@ -159,17 +221,8 @@ void Renderer::draw(){
 			showObject = true;
 		}
 	}
-	if(showObject){
-		if (ImGui::Begin("Settings")) {
-			if(ImGui::InputInt("Subobject ID", &subObjectId)){
-				subObjectId = std::min(std::max(subObjectId,-1), (int)_age->objects()[objectId]->subObjects().size()-1);
-			}
-			if(ImGui::InputInt("Layer ID", &layerId)){
-				layerId = std::min(std::max(layerId,-1), (int)_age->objects()[objectId]->subObjects()[subObjectId].material->getLayers().size()-1);
-			}
-		}
-		ImGui::End();
-	}
+	
+	
 	
 	//ImGui::ShowTestWindow();
 	if(showTextures){
