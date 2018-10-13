@@ -61,6 +61,7 @@ void Renderer::draw(){
 	static float cullingDistance = 1500.0f;
 	static int drawCount = 0;
 	
+	static bool forceLighting = false;
 	if (ImGui::Begin("Infos")) {
 		
 		ImGui::Text("%2.1f FPS (%2.1f ms)", ImGui::GetIO().Framerate, ImGui::GetIO().DeltaTime*1000.0f);
@@ -109,6 +110,16 @@ void Renderer::draw(){
 			
 		}
 		
+		if(ImGui::Checkbox("Force lighting", &forceLighting)){
+			const auto prog = Resources::manager().getProgram("object_basic");
+			glUseProgram(prog->id());
+			glUniform1i(prog->uniform("forceLighting"), forceLighting);
+			glUseProgram(0);
+			const auto prog1 = Resources::manager().getProgram("object_special");
+			glUseProgram(prog1->id());
+			glUniform1i(prog1->uniform("forceLighting"), forceLighting);
+			glUseProgram(0);
+		}
 		ImGui::Checkbox("Wireframe", &wireframe);
 		ImGui::SameLine();
 		ImGui::Checkbox("Culling", &doCulling);

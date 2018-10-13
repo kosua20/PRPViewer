@@ -41,6 +41,7 @@ uniform int uvSource;// normal -1, position -2, relect -3, else
 uniform int useTexture;
 uniform bvec2 clampedTexture;
 
+uniform bool forceLighting = false;
 
 // Output: tangent space matrix, position in view space and uv.
 out INTERFACE {
@@ -94,7 +95,7 @@ void main(){
 	
 	
 		
-	vec4 ambientFinal = clamp(MAmbient*(globalAmbient+LAmbient), 0.0, 1.0);
+	vec4 ambientFinal = forceLighting ? vec4(1.0) : clamp(MAmbient*(globalAmbient+LAmbient), 0.0, 1.0);
 	vec4 diffuseFinal = clamp(LDiffuse, 0.0, 1.0);
 	vec4 material = clamp(ambientFinal + diffuseFinal + MEmissive, 0.0, 1.0);
 		
