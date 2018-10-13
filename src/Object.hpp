@@ -25,6 +25,14 @@ public:
 		MeshInfos mesh;
 		hsGMaterial * material;
 		unsigned int mode;
+		bool transparent;
+		
+		SubObject(MeshInfos amesh, hsGMaterial * amaterial, unsigned int amode, bool atransparent){
+			mesh = amesh;
+			material = amaterial;
+			mode = amode;
+			transparent = atransparent;
+		}
 	};
 	
 	Object(const Type & type, std::shared_ptr<ProgramInfos> prog, const glm::mat4 & model, const std::string & name);
@@ -34,7 +42,7 @@ public:
 	void addSubObject(const MeshInfos & infos, hsGMaterial * material, const unsigned int shadingMode);
 	
 	/// Update function
-	void update(const glm::mat4& model);
+	//void update(const glm::mat4& model);
 	
 	/// Draw function
 	void drawDebug(const glm::mat4& view, const glm::mat4& projection, const int subObject = -1) const;
@@ -52,14 +60,20 @@ public:
 	
 	const bool isVisible(const glm::vec3 & point, const glm::mat4 & viewproj) const;
 	
-	const std::vector<SubObject> & subObjects(){ return _subObjects; }
+	const bool contains( const std::shared_ptr<Object> & other) const;
+	
+	const std::vector<std::shared_ptr<SubObject>> & subObjects(){ return _subObjects; }
 	
 	bool enabled;
 	
+	const bool transparent(){ return _transparent; }
+	
+	const bool billboard(){ return _billboard; }
+	
 private:
 	
-	void renderLayer(const SubObject & subObject, plLayerInterface * lay, const int tid) const;
-	void renderLayerMult(const SubObject & subObject, plLayerInterface * lay0, plLayerInterface * lay1, const int tid) const;
+	void renderLayer(const std::shared_ptr<SubObject> & subObject, plLayerInterface * lay, const int tid) const;
+	void renderLayerMult(const std::shared_ptr<SubObject> & subObject, plLayerInterface * lay0, plLayerInterface * lay1, const int tid) const;
 	
 	void resetState() const;
 	void depthState(plLayerInterface* lay, const bool forceDecal, const int tid) const;
@@ -69,13 +83,17 @@ private:
 	void textureStateCustom(const std::shared_ptr<ProgramInfos> & program, plLayerInterface* lay) const;
 	std::shared_ptr<ProgramInfos> _program;
 	
-	std::vector<SubObject> _subObjects;
+	std::vector<std::shared_ptr<SubObject>> _subObjects;
+	
 	
 	Type _type;
 	glm::mat4 _model;
 	std::string _name;
 	BoundingBox _localBounds;
 	BoundingBox _globalBounds;
+	
+	bool _transparent;
+	bool _billboard;
 };
 
 #endif

@@ -73,7 +73,7 @@ void Renderer::draw(){
 			ImGui::Text("Current: %s", _age->objects()[objectId]->getName().c_str());
 			ImGui::Text("%lu subobjects", _age->objects()[objectId]->subObjects().size());
 			if(subObjectId>-1){
-				ImGui::Text("%lu layers", _age->objects()[objectId]->subObjects()[subObjectId].material->getLayers().size());
+				ImGui::Text("%lu layers", _age->objects()[objectId]->subObjects()[subObjectId]->material->getLayers().size());
 			}
 		}
 	}
@@ -193,7 +193,7 @@ void Renderer::draw(){
 			for(int soid = 0; soid < obj->subObjects().size(); ++soid){
 				const auto & subobj = obj->subObjects()[soid];
 				if(ImGui::TreeNodeEx((void*)(intptr_t)soid, parentFlags, "Subobject %i", soid)){
-					for(const auto & layer : subobj.material->getLayers()){
+					for(const auto & layer : subobj->material->getLayers()){
 						if(ImGui::TreeNodeEx(layer->getName().c_str(), parentFlags, "%s", layer->getName().c_str())){
 							
 							plLayerInterface * lay = plLayerInterface::Convert(layer->getObj());
@@ -213,7 +213,7 @@ void Renderer::draw(){
 				layerId = -1;
 			}
 			if(ImGui::InputInt("Layer ID", &layerId)){
-				layerId = std::min(std::max(layerId,-1), (int)_age->objects()[objectId]->subObjects()[subObjectId].material->getLayers().size()-1);
+				layerId = std::min(std::max(layerId,-1), (int)_age->objects()[objectId]->subObjects()[subObjectId]->material->getLayers().size()-1);
 			}
 			
 		}
@@ -258,16 +258,50 @@ void Renderer::draw(){
 		const glm::mat4 viewproj = _camera.projection() * _camera.view();
 		drawCount = 0;
 		auto objects = _age->objectsClone();
-		/*auto& camera = _camera;
+		auto& camera = _camera;
+		
 		std::sort(objects.begin(), objects.end(), [&camera](const std::shared_ptr<Object> & leftObj, const std::shared_ptr<Object> & rightObj){
-			
+			// Billboard after non billboard, whatever the transparency state.
+			if(leftObj->billboard() && !rightObj->billboard()){
+				return false;
+			}
+			if(!leftObj->billboard() && rightObj->billboard()){
+				return true;
+			}
+			// Transparent is necessarily later than non transparent.
+			if(leftObj->transparent() && !rightObj->transparent()){
+				return false;
+			}
+			if(!leftObj->transparent() && rightObj->transparent()){
+				return true;
+			}
+			// All "crossed cases" have been handled.
 			// Compute both distances to camera.
 			const float leftDist = glm::length2(leftObj->getCenter() - camera.getPosition());
 			const float rightDist = glm::length2(rightObj->getCenter() - camera.getPosition());
-			// We want to first render objects further away from the camera.
-			return leftDist > rightDist;
 			
-		});*/
+			// Either they are both billboard, both transparent, or both opaque.
+			if(!leftObj->transparent()){
+				// Both are non transparent, render the closest first.
+				// We don't really care.
+				return leftDist < rightDist;
+			}
+			// Else if one is contained in the other, render it first.
+			if(leftObj->contains(rightObj)){
+				return false;
+			} else if(rightObj->contains(leftObj)){
+				return true;
+			}
+			// Else render the furthest first.
+			return leftDist > rightDist;
+
+		});
+		
+		// Rendering order:
+		// opaque objects from closest to furthest.
+		// transparent objects (subojects?) from furthest to closest (maybe at least use the bounding box of the transparent subojects.
+		// billboards are after the transparent objects.
+		
 		for(const auto & object : objects){
 			if(!object->enabled){
 				continue;

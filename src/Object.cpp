@@ -13,6 +13,12 @@ Object::Object(const Type & type, std::shared_ptr<ProgramInfos> prog, const glm:
 	_model = glm::mat4(model);
 	_name = name;
 	enabled = true;
+	_transparent = false;
+	_billboard = false;
+	
+	if(_type == Billboard || _type == BillboardY){
+		_billboard = true;
+	}
 }
 
 Object::~Object() {}
@@ -24,16 +30,37 @@ void Object::addSubObject(const MeshInfos & infos, hsGMaterial * material, const
 	} else {
 		_localBounds += infos.bbox;
 	}
-	_subObjects.push_back({infos, material, shadingMode});
 	
 	_localBounds.updateValues();
 	_globalBounds = _localBounds.transform(_model);
+	// Check if subobject is transparent.
+	bool isAlphaBlend = false;
+	if(!material->getLayers().empty()){
+		const auto & layKey = material->getLayers()[0];
+		// Obtain the layer to aply.
+		const plLayerInterface * lay = plLayerInterface::Convert(layKey->getObj(), false);
+		isAlphaBlend = lay->getState().fBlendFlags & hsGMatState::kBlendAlpha;
+		_transparent = _transparent || isAlphaBlend;
+	}
+	auto newSubObject = std::make_shared<SubObject>(infos, material, shadingMode, isAlphaBlend);
+	
+	_subObjects.push_back(newSubObject);
+	
+	// Should we instead sort the transparent and non transparent subobjects too ?
+	//if(isAlphaBlend || !_transparent){
+	//	_subObjects.push_back(newSubObject);
+	//} else {
+	//		size_t soid = 0;
+	//		while(soid < _subObjects.size() && !_subObjects[soid]->transparent){
+	//			++soid;
+	//		}
+	//// Soid is the first transparent element, or the size.
+	//_subObjects.insert(_subObjects.begin()+soid, newSubObject);
+	//}
+	
 }
 
-void Object::update(const glm::mat4& model) {
-	_model = model;
-	_globalBounds = _localBounds.transform(_model);
-}
+
 
 const bool Object::isVisible(const glm::vec3 & point, const glm::mat4 & viewproj) const {
 	return _globalBounds.contains(point) || _globalBounds.intersectsFrustum(viewproj);
@@ -41,6 +68,10 @@ const bool Object::isVisible(const glm::vec3 & point, const glm::mat4 & viewproj
 
 const bool Object::isVisible(const glm::vec3 & point, const glm::vec3 & dir) const {
 	return _globalBounds.contains(point) || _globalBounds.isVisible(point, dir);
+}
+
+const bool Object::contains( const std::shared_ptr<Object> & other) const {
+	return _globalBounds.contains(other->_globalBounds);
 }
 
 void Object::drawDebug(const glm::mat4& view, const glm::mat4& projection, const int subObjId) const {
@@ -74,12 +105,13 @@ void Object::drawDebug(const glm::mat4& view, const glm::mat4& projection, const
 		if(subObjId > -1 && subObjId != sid){
 			continue;
 		}
-		glBindVertexArray(subObject.mesh.vId);
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, subObject.mesh.eId);
-		glDrawElements(GL_TRIANGLES, subObject.mesh.count, GL_UNSIGNED_INT, (void*)0);
+		glBindVertexArray(subObject->mesh.vId);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, subObject->mesh.eId);
+		glDrawElements(GL_TRIANGLES, subObject->mesh.count, GL_UNSIGNED_INT, (void*)0);
 	}
 	
 	if(_type != Billboard && _type != BillboardY){
+		// TODO: take barycenter of vertices instead.
 		const auto center = _globalBounds.center;
 		const auto scale = _globalBounds.getScale()*0.5f;
 		glm::mat4 iden = glm::scale(glm::translate(glm::mat4(1.0f), center), scale);
@@ -100,8 +132,6 @@ void Object::drawDebug(const glm::mat4& view, const glm::mat4& projection, const
 
 void Object::draw(const glm::mat4& view, const glm::mat4& projection, const int subObjId, const int layerId) const {
 
-	
-	
 	// Compute final view and model matrices.
 	glm::mat4 MV = view * _model;
 	if(_type == Billboard || _type == BillboardY){
@@ -125,6 +155,7 @@ void Object::draw(const glm::mat4& view, const glm::mat4& projection, const int 
 	glUniformMatrix3fv(_program->uniform("normalMatrix"), 1, GL_FALSE, &normalMatrix[0][0]);
 	
 	int sid = -1;
+	
 	for(const auto & subObject : _subObjects){
 		
 		glPolygonOffset(0.0f, 0.0f);
@@ -135,21 +166,21 @@ void Object::draw(const glm::mat4& view, const glm::mat4& projection, const int 
 			continue;
 		}
 		// Render each layer, one after the other.
-		if(!subObject.material){
+		if(!subObject->material){
 			continue;
 		}
-		if(subObject.material->getLayers().size() == 1 && !plLayerInterface::Convert(subObject.material->getLayers()[0]->getObj(), false)->getTexture().Exists()){
+		if(subObject->material->getLayers().size() == 1 && !plLayerInterface::Convert(subObject->material->getLayers()[0]->getObj(), false)->getTexture().Exists()){
 			continue;
 		}
 		   
 		// Transparent object: layer  has non unit opacity + blend.
-		for(size_t tid = 0; tid < subObject.material->getLayers().size(); tid++){
+		for(size_t tid = 0; tid < subObject->material->getLayers().size(); tid++){
 			
 			
 			if(layerId > -1 && tid > layerId){
 				continue;
 			}
-			const auto & layKey = subObject.material->getLayers()[tid];
+			const auto & layKey = subObject->material->getLayers()[tid];
 			// Obtain the layer to aply.
 			plLayerInterface * lay = plLayerInterface::Convert(layKey->getObj(), false);
 			
@@ -169,13 +200,13 @@ void Object::draw(const glm::mat4& view, const glm::mat4& projection, const int 
 				continue;
 			}
 			
-			// TODO: cache this at laod time.
-			if(tid < subObject.material->getLayers().size()-1){
+			// TODO: cache this at load time?
+			if(tid < subObject->material->getLayers().size()-1){
 				
 				const bool restartBindNext = (lay->getState().fMiscFlags & hsGMatState::kMiscBindNext) && (lay->getState().fMiscFlags & hsGMatState::kMiscRestartPassHere);
 				
 				if(restartBindNext){
-					plLayerInterface * layNext = plLayerInterface::Convert(subObject.material->getLayers()[tid+1]->getObj(), false);
+					plLayerInterface * layNext = plLayerInterface::Convert(subObject->material->getLayers()[tid+1]->getObj(), false);
 					const bool nextIsAlphaBlend = (layNext->getState().fBlendFlags & hsGMatState::kBlendAlphaMult) && (layNext->getState().fBlendFlags & hsGMatState::kBlendNoTexColor);
 					if(nextIsAlphaBlend){
 						// Render both at the same time, using our special shader.
@@ -198,10 +229,6 @@ void Object::draw(const glm::mat4& view, const glm::mat4& projection, const int 
 			renderLayer(subObject, lay, tid);
 			
 		}
-		
-		
-		
-		
 	}
 	
 	glUseProgram(0);
@@ -481,7 +508,7 @@ void Object::textureStateCustom(const std::shared_ptr<ProgramInfos> & program, p
 		infos = Resources::manager().getTexture(lay->getTexture()->getName().to_std_string());
 		glUniformMatrix4fv(program->uniform("uvMatrix1"), 1, GL_FALSE, lay->getTransform().glMatrix());
 		if(infos.cubemap){
-			Log::Error() << "Cubemap ALpha pseudo vertex not supported." << std::endl;
+			Log::Error() << "Cubemap Alpha pseudo vertex not supported." << std::endl;
 		} else {
 			glActiveTexture(GL_TEXTURE0+2);
 			glBindTexture(GL_TEXTURE_2D, infos.id);
@@ -513,20 +540,20 @@ void Object::textureStateCustom(const std::shared_ptr<ProgramInfos> & program, p
 	checkGLError();
 }
 
-void Object::renderLayer(const SubObject & subObject, plLayerInterface * lay, const int tid) const {
+void Object::renderLayer(const std::shared_ptr<SubObject> & subObject, plLayerInterface * lay, const int tid) const {
 	
-	const bool forceDecal = subObject.material->getCompFlags() & hsGMaterial::kCompDecal;
+	const bool forceDecal = subObject->material->getCompFlags() & hsGMaterial::kCompDecal;
 	
 	resetState();
 	depthState(lay, forceDecal, tid);
-	shadeState(_program, lay, subObject.mode);
+	shadeState(_program, lay, subObject->mode);
 	blendState(_program, lay);
 	textureState(_program, lay);
 	
 	// Render.
-	glBindVertexArray(subObject.mesh.vId);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, subObject.mesh.eId);
-	glDrawElements(GL_TRIANGLES, subObject.mesh.count, GL_UNSIGNED_INT, (void*)0);
+	glBindVertexArray(subObject->mesh.vId);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, subObject->mesh.eId);
+	glDrawElements(GL_TRIANGLES, subObject->mesh.count, GL_UNSIGNED_INT, (void*)0);
 	
 	// Reset states.
 	glBindVertexArray(0);
@@ -534,23 +561,23 @@ void Object::renderLayer(const SubObject & subObject, plLayerInterface * lay, co
 	checkGLError();
 }
 
-void Object::renderLayerMult(const SubObject & subObject, plLayerInterface * lay0, plLayerInterface * lay1, const int tid) const {
+void Object::renderLayerMult(const std::shared_ptr<SubObject> & subObject, plLayerInterface * lay0, plLayerInterface * lay1, const int tid) const {
 	
-	const bool forceDecal = subObject.material->getCompFlags() & hsGMaterial::kCompDecal;
+	const bool forceDecal = subObject->material->getCompFlags() & hsGMaterial::kCompDecal;
 	// Set everything as usual first.
 	const auto & program = Resources::manager().getProgram("object_special");
 	resetState();
 	depthState(lay0, forceDecal, tid);
-	shadeState(program,lay0, subObject.mode);
+	shadeState(program,lay0, subObject->mode);
 	blendState(program,lay0);
 	glUniform1i(program->uniform("invertVertexAlpha1"), lay1->getState().fBlendFlags & hsGMatState::kBlendInvertVtxAlpha ? 1 : 0);
 	textureState(program,lay0);
 	textureStateCustom(program, lay1);
 	
 	// Render.
-	glBindVertexArray(subObject.mesh.vId);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, subObject.mesh.eId);
-	glDrawElements(GL_TRIANGLES, subObject.mesh.count, GL_UNSIGNED_INT, (void*)0);
+	glBindVertexArray(subObject->mesh.vId);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, subObject->mesh.eId);
+	glDrawElements(GL_TRIANGLES, subObject->mesh.count, GL_UNSIGNED_INT, (void*)0);
 	
 	// Reset states.
 	glBindVertexArray(0);
