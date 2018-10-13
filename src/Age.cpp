@@ -63,7 +63,6 @@ Age::Age(const std::string & path){
 }
 
 Age::~Age(){
-
 	for(const auto & obj : _objects){
 		obj->clean();
 	}
@@ -75,73 +74,6 @@ unsigned char reverse(unsigned char b) {
 	return b;
 }
 
-std::shared_ptr<ProgramInfos> Age::generateShaders(hsGMaterial * mat){
-	std::vector<std::string> vertexLines = { "#version 330" };
-	std::vector<std::string> fragmentLines = { "#version 330" };
-	
-	
-	vertexLines.emplace_back("layout(location = 0) in vec3 v;");
-	vertexLines.emplace_back("layout(location = 1) in vec3 n;");
-	vertexLines.emplace_back("layout(location = 2) in vec4 col;");
-	
-	vertexLines.emplace_back("uniform mat4 mvp;");
-	vertexLines.emplace_back("uniform mat4 mv;");
-	vertexLines.emplace_back("uniform mat3 normalMatrix;");
-	//uniform int layerCount;
-	
-	vertexLines.emplace_back("uniform mat4 invV;");
-	
-	// Output: tangent space matrix, position in view space and uv.
-	vertexLines.emplace_back("out INTERFACE {");
-	vertexLines.emplace_back("	vec4 color;");
-	vertexLines.emplace_back("	vec4 camPos;");
-	vertexLines.emplace_back("	vec4 camNor;");
-	//vertexLines.emplace_back("	vec3 uv[10];
-	vertexLines.emplace_back("} Out ;");
-	
-	
-	vertexLines.emplace_back("void main(){");
-		
-	vertexLines.emplace_back("vec4 viewPos = mv * vec4(v, 1.0);");
-	vertexLines.emplace_back("Out.camPos = viewPos;");
-	vertexLines.emplace_back("Out.camNor = vec4(normalMatrix * n, 1.0);");
-	
-	vertexLines.emplace_back("vec4 clipPos = mvp * vec4(v, 1.0);");
-	vertexLines.emplace_back("gl_Position = clipPos;");
-	vertexLines.emplace_back("gl_Position.z = gl_Position.z * 2.0 - gl_Position.w;");
-	vertexLines.emplace_back("Out.color = col;");
-	
-	vertexLines.emplace_back("}");
-	
-	// Output: tangent space matrix, position in view space and uv.
-	fragmentLines.emplace_back("in INTERFACE {");
-	fragmentLines.emplace_back("	vec4 color;");
-	fragmentLines.emplace_back("	vec4 camPos;");
-	fragmentLines.emplace_back("	vec4 camNor;");
-	//	fragmentLines.emplace_back("vec3 uv[10];
-	fragmentLines.emplace_back("} In ;");
-	
-	
-	fragmentLines.emplace_back("out vec4 fragColor;");
-	
-	fragmentLines.emplace_back("void main(){");
-	
-	fragmentLines.emplace_back("fragColor = In.color;");
-	fragmentLines.emplace_back("}");
-	
-	std::string programName = "default";
-	std::string vertexContent;
-	for(const auto & line : vertexLines){
-		vertexContent.append(line);
-		vertexContent.append("\n");
-	}
-	std::string fragmentContent;
-	for(const auto & line : fragmentLines){
-		fragmentContent.append(line);
-		fragmentContent.append("\n");
-	}
-	return Resources::manager().registerProgram(programName, vertexContent, fragmentContent);
-}
 
 void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 	plSceneNode* scene = rm.getSceneNode(ploc);
@@ -205,7 +137,6 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 			}*/
 			
 			//Log::Info() << objKey->getName() << std::endl;
-			//generateShaders(mat);
 			_objects.emplace_back(new Object(type, Resources::manager().getProgram("object_basic"), model, objKey->getName().to_std_string()));
 			
 			

@@ -300,7 +300,7 @@ const TextureInfos Resources::getTexture(const std::string & name, bool srgb){
 	
 	// If couldn't file the image, return empty texture infos.
 	if(!name.empty()){
-		Log::Error() << Log::Resources << "Unable to find texture named \"" << name << "\"." << std::endl;
+		//Log::Error() << Log::Resources << "Unable to find texture named \"" << name << "\"." << std::endl;
 	}
 	return getTexture("DEBUG_DEFAULT");
 }

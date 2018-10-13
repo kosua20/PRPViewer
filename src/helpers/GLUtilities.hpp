@@ -98,6 +98,11 @@ struct BoundingBox {
 		&& point.z <= maxs.z && point.z >= mins.z;
 	}
 	
+	bool contains(const BoundingBox & other) const {
+		// minis and maxis should both be in the box.
+		return contains(other.mins) && contains(other.maxs);
+	}
+	
 	bool intersectsFrustum(const glm::mat4 & viewproj) const {
 		// TODO: improve support for covering/side-to-side intersections.
 		const unsigned char f000 = getQuadrant(c000, viewproj);

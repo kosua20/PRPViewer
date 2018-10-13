@@ -57,10 +57,9 @@ void Renderer::draw(){
 	static bool showList = false;
 	static bool wireframe = true;
 	static bool doCulling = true;
-	static bool multipleSelection = false;
+	static bool multipleSelection = true;
 	static float cullingDistance = 1500.0f;
 	static int drawCount = 0;
-	
 	static bool forceLighting = false;
 	if (ImGui::Begin("Infos")) {
 		
@@ -178,6 +177,8 @@ void Renderer::draw(){
 					for(size_t doid = oid+1; doid < _age->objects().size(); ++doid){
 						_age->objects()[doid]->enabled = false;
 					}
+					//Reset the enabled sub object, etc.
+					subObjectId = layerId = -1;
 				}
 			}
 		}
@@ -209,6 +210,7 @@ void Renderer::draw(){
 			}
 			if(ImGui::InputInt("Subobject ID", &subObjectId)){
 				subObjectId = std::min(std::max(subObjectId,-1), (int)_age->objects()[objectId]->subObjects().size()-1);
+				layerId = -1;
 			}
 			if(ImGui::InputInt("Layer ID", &layerId)){
 				layerId = std::min(std::max(layerId,-1), (int)_age->objects()[objectId]->subObjects()[subObjectId].material->getLayers().size()-1);
@@ -291,19 +293,19 @@ void Renderer::draw(){
 	const auto debugProgram = Resources::manager().getProgram("camera-center");
 	const auto debugObject = Resources::manager().getMesh("sphere");
 	
+	// Render the camera cursor.
 	glDisable(GL_BLEND);
 	glEnable(GL_DEPTH_TEST);
 	glDisable(GL_CULL_FACE);
 	glUseProgram(debugProgram->id());
 	glBindVertexArray(debugObject.vId);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, debugObject.eId);
-	
 	glUniformMatrix4fv(debugProgram->uniform("mvp"), 1, GL_FALSE, &MVP[0][0]);
 	glUniform2f(debugProgram->uniform("screenSize"), _config.screenResolution[0], _config.screenResolution[1]);
 	glDrawElements(GL_TRIANGLES, debugObject.count, GL_UNSIGNED_INT, (void*)0);
 	
 	
-	
+	// Reset state.
 	glBindVertexArray(0);
 	glUseProgram(0);
 	glEnable(GL_CULL_FACE);
