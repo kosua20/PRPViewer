@@ -40,17 +40,35 @@ protected:
 	
 	Config & _config;
 	glm::vec2 _renderResolution;
+	float _resolutionScaling;
 	
 private:
 	
 	std::shared_ptr<Age> _age;
 	ScreenQuad _quad;
+	ScreenQuad _fxaaquad;
 	Camera _camera;
+	std::shared_ptr<Framebuffer> _sceneFramebuffer;
+	
+	
+	bool _wireframe = true;
+	bool _doCulling = true;
+	float _cullingDistance = 1500.0f;
+	int _drawCount = 0;
+	bool _forceLighting = false;
+	
+	enum DisplayMode {
+		Scene = 0, OneObject = 1, OneTexture = 2
+	};
+	
+	DisplayMode _displayMode;
+	int _objectId = 0;
+	int _textureId = 0;
+	int _subObjectId = -1;
+	int _subLayerId = -1;
 	
 	void defaultGLSetup();
 	void loadAge(const std::string & path);
-	
-	//size_t _maxLayer = 0;
 };
 
 #endif

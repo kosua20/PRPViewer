@@ -9,75 +9,92 @@
 #include <stdio.h>
 #include <vector>
 
+bool findSubstringInsensitive(const std::string & strHaystack, const std::string & strNeedle)
+{
+	auto it = std::search(
+						  strHaystack.begin(), strHaystack.end(),
+						  strNeedle.begin(),   strNeedle.end(),
+						  [](char ch1, char ch2) { return std::toupper(ch1) == std::toupper(ch2); }
+						  );
+	return (it != strHaystack.end() );
+}
 
 Renderer::~Renderer(){}
 
 Renderer::Renderer(Config & config) : _config(config) {
 	
 	// Initial render resolution.
-	_renderResolution = (_config.internalVerticalResolution/_config.screenResolution[1]) * _config.screenResolution;
+	_renderResolution = _config.screenResolution;
 	
 	defaultGLSetup();
 	
 	_quad.init("passthrough");
+	_fxaaquad.init("fxaa");
 	// Setup camera parameters.
 	_camera.projection(config.screenResolution[0]/config.screenResolution[1], 1.3f, 0.1f, 8000.0f);
-	for(int i = 0; i < 8; ++i){
-		//Resources::manager().getProgram("object_basic")->registerTexture("textures["+std::to_string(i)+"]", i);
-		//Resources::manager().getProgram("object_basic")->registerTexture("cubemaps["+std::to_string(i)+"]", 8+i);
-	}
+	
+	_sceneFramebuffer = std::make_shared<Framebuffer>(_renderResolution[0], _renderResolution[1], GL_RGB, GL_UNSIGNED_BYTE, GL_RGB8, GL_LINEAR, GL_CLAMP_TO_EDGE, true);
+	
 	Resources::manager().getProgram("object_basic")->registerTexture("textures", 0);
 	Resources::manager().getProgram("object_basic")->registerTexture("cubemaps", 1);
 	Resources::manager().getProgram("object_special")->registerTexture("textures", 0);
 	Resources::manager().getProgram("object_special")->registerTexture("cubemaps", 1);
 	Resources::manager().getProgram("object_special")->registerTexture("textures1", 2);
 	
-	
 	std::vector<std::string> files = ImGui::listFiles("../../../data/mystv/", false, false, {"age"});
 	
-	loadAge("../../../data/uru/spyroom.age");
+	_age = std::make_shared<Age>();
+	_resolutionScaling = 100.0f;
+	//loadAge("../../../data/uru/spyroom.age");
 }
 
 
 
 void Renderer::draw(){
-	glViewport(0, 0, GLsizei(_config.screenResolution[0]), GLsizei(_config.screenResolution[1]));
-	glClearColor(0.45f,0.45f, 0.5f, 1.0f);
-	glClearDepth(1.0f);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	
-	// FIXME: move to attributes.
-	static int textureId = 0;
-	static bool showTextures = false;
-	static int objectId = 0;
-	static int subObjectId = -1;
-	static int layerId = -1;
-	
-	static bool showObject = false;
-	static bool showList = false;
-	static bool wireframe = true;
-	static bool doCulling = true;
-	static bool multipleSelection = true;
-	static float cullingDistance = 1500.0f;
-	static int drawCount = 0;
-	static bool forceLighting = false;
+	// Infos window.
 	if (ImGui::Begin("Infos")) {
-		
 		ImGui::Text("%2.1f FPS (%2.1f ms)", ImGui::GetIO().Framerate, ImGui::GetIO().DeltaTime*1000.0f);
-		ImGui::Text("Age: %s", (_age ? _age->getName().c_str() : "None"));
-		ImGui::Text("Draws: %i/%lu", drawCount, _age->objects().size());
-		if(showTextures){
-			ImGui::Text("Current: %s", _age->textures()[textureId].c_str());
-		}
-		if(showObject){
-			ImGui::Text("Current: %s", _age->objects()[objectId]->getName().c_str());
-			ImGui::Text("%lu subobjects", _age->objects()[objectId]->subObjects().size());
-			if(subObjectId>-1){
-				ImGui::Text("%lu layers", _age->objects()[objectId]->subObjects()[subObjectId]->material->getLayers().size());
+		ImGui::Text("Age: %s", (_age->getName().c_str()));
+		
+		if(_displayMode == OneObject && _objectId < _age->objects().size()) {
+			
+			const auto & selectedObj = _age->objects()[_objectId];
+			ImGui::Text("Object: %s, %lu parts", selectedObj->getName().c_str(), selectedObj->subObjects().size());
+			if(_subObjectId>-1){
+				ImGui::Text("Part: %d, %lu layers", _subObjectId, selectedObj->subObjects()[_subObjectId]->material->getLayers().size());
 			}
+			
+			const ImGuiTreeNodeFlags parentFlags = 0 ;
+			
+			for(int soid = 0; soid < selectedObj->subObjects().size(); ++soid){
+				const auto & subobj = selectedObj->subObjects()[soid];
+				if(ImGui::TreeNodeEx((void*)(intptr_t)soid, parentFlags, "Subobject %i", soid)){
+					for(const auto & layer : subobj->material->getLayers()){
+						if(ImGui::TreeNodeEx(layer->getName().c_str(), parentFlags, "%s", layer->getName().c_str())){
+							plLayerInterface * lay = plLayerInterface::Convert(layer->getObj());
+							const std::string logString = logLayer(lay);
+							ImGui::TextWrapped("%s", logString.c_str());
+							ImGui::TreePop();
+						}
+					}
+					ImGui::TreePop();
+				}
+			}
+		} else if(_displayMode == OneTexture && _textureId < _age->textures().size()){
+			const std::string & textureName = _age->textures()[_textureId];
+			ImGui::Text("Texture: %s", textureName.c_str());
+			const auto & texInfos = Resources::manager().getTexture(textureName);
+			ImGui::Text("(%d x %d), %s %d mips", texInfos.width, texInfos.height, (texInfos.cubemap ? "Cube" : "2D"), texInfos.mipmap);
+		} else {
+			ImGui::Text("Draws: %i/%lu objects", _drawCount, _age->objects().size());
 		}
+
 	}
 	ImGui::End();
+	
+	
+#define DEFAULT_WIDTH 160
 	
 	if (ImGui::Begin("Settings")) {
 		static int current_item_id = 0;
@@ -89,178 +106,229 @@ void Renderer::draw(){
 		if(ImGui::BeginFilePicker("Load Age", "Load a .age file.", "../../../data/", selectedFile, false, false, {"age"})){
 			loadAge(selectedFile);
 			current_item_id = 0;
-			textureId = 0;
-			objectId = 0;
-			subObjectId = -1;
-			layerId = -1;
-			showTextures = false;
+			
 		}
-		
 		
 		auto linkingNameProvider = [](void* data, int idx, const char** out_text) {
 			const std::vector<std::string>* arr = (std::vector<std::string>*)data;
 			*out_text = (*arr)[idx].c_str();
 			return true;
 		};
+		ImGui::PushItemWidth(DEFAULT_WIDTH);
 		if (ImGui::Combo("Linking point", &current_item_id, linkingNameProvider, (void*)&(_age->linkingNames()), _age->linkingNames().size())) {
 			if (current_item_id >= 0) {
 				_camera.setCenter(_age->linkingPoints().at(_age->linkingNames()[current_item_id]));
 			}
-			
 		}
+		ImGui::PopItemWidth();
 		
-		if(ImGui::Checkbox("Force lighting", &forceLighting)){
+		ImGui::Checkbox("Wireframe", &_wireframe);
+		ImGui::SameLine();
+		if(ImGui::Checkbox("Default light", &_forceLighting)){
 			const auto prog = Resources::manager().getProgram("object_basic");
 			glUseProgram(prog->id());
-			glUniform1i(prog->uniform("forceLighting"), forceLighting);
+			glUniform1i(prog->uniform("forceLighting"), _forceLighting);
 			glUseProgram(0);
 			const auto prog1 = Resources::manager().getProgram("object_special");
 			glUseProgram(prog1->id());
-			glUniform1i(prog1->uniform("forceLighting"), forceLighting);
+			glUniform1i(prog1->uniform("forceLighting"), _forceLighting);
 			glUseProgram(0);
 		}
-		ImGui::Checkbox("Wireframe", &wireframe);
-		ImGui::SameLine();
-		ImGui::Checkbox("Culling", &doCulling);
-		ImGui::SliderFloat("Culling dist.", &cullingDistance, 10.0f, 3000.0f);
-		ImGui::Checkbox("Show textures", &showTextures);
 		
-		if(showTextures){
-			if(ImGui::InputInt("Texture ID", &textureId)){
-				objectId = std::min(std::max(textureId,0), (int)_age->textures().size()-1);
-			}
+		ImGui::Checkbox("Culling", &_doCulling); ImGui::SameLine();
+		ImGui::PushItemWidth(90.0f);
+		ImGui::SliderFloat("Dist.", &_cullingDistance, 10.0f, 3000.0f);
+		ImGui::PopItemWidth();
+		// Camera.
+		ImGui::PushItemWidth(DEFAULT_WIDTH);
+		ImGui::SliderFloat("Camera speed", &_camera.speed(), 0.0f, 500.0f);
+		if(ImGui::SliderFloat("Resolution %", &_resolutionScaling, 10.0, 200.0)){
+			_resolutionScaling = std::min(std::max(_resolutionScaling, 10.0f), 200.0f);
+			updateResolution(_config.screenResolution[0], _config.screenResolution[1]);
 		}
+		ImGui::PopItemWidth();
 		
 	}
 	ImGui::End();
+	
+	// Display the log window.
 	Log::Info().display();
+	
 	
 	if(ImGui::Begin("Listing")){
 		
-		if(ImGui::Button("All")){
-			for(auto & object : _age->objects()){
-				object->enabled = true;
-			}
-		}
-		ImGui::SameLine();
-		if(ImGui::Button("None")){
-			for(auto & object : _age->objects()){
-				object->enabled = false;
-			}
-		}
-		ImGui::SameLine();
-		if(ImGui::Checkbox("Multiple", &multipleSelection)){
-			if(!multipleSelection){
-				// Disable all but one element.
-				bool first = true;
-				for(size_t oid = 0; oid < _age->objects().size(); ++oid){
-					if(first && _age->objects()[oid]->enabled){
-						first = false;
-						continue;
-					}
-					_age->objects()[oid]->enabled = false;
+		ImGui::Combo("Mode", (int*)(&_displayMode), "Scene\0Object\0Texture\0\0");
+		
+		if(_displayMode == Scene){
+			if(ImGui::Button("All")){
+				for(auto & object : _age->objects()){
+					object->enabled = true;
 				}
+			}
+			ImGui::SameLine();
+			if(ImGui::Button("None")){
+				for(auto & object : _age->objects()){
+					object->enabled = false;
+				}
+			}
+			ImGui::SameLine();
+		}
+		
+		if(ImGui::Button("List all content")){
+			Log::Info() << "Objects: " << std::endl;
+			int pii = 0;
+			for(const auto & object : _age->objects()){
+				Log::Info() << object->getName() << ", ";
+				++pii;
+				if(pii%5 == 0){
+					Log::Info() << std::endl;
+				}
+			}
+			Log::Info() << std::endl;
+			
+			Log::Info() << "Textures: " << std::endl;
+			pii = 0;
+			for(const auto & texture : _age->textures()){
+				Log::Info() << texture << ", ";
+				++pii;
+				if(pii%5 == 0){
+					Log::Info() << std::endl;
+				}
+			}
+			Log::Info() << std::endl;
+		}
+		
+		// Search in current list (objects or textures).
+		static char * searchString = new char[512];
+		ImGui::InputText("Query", searchString, 512);
+		if(ImGui::Button("Search")){
+			const std::string searchQueryString(searchString);
+			std::vector<std::pair<int, std::string>> results;
+			
+			if(_displayMode == Scene || _displayMode == OneObject){
+				for(size_t oid = 0; oid < _age->objects().size(); ++oid){
+					const auto & obj = _age->objects()[oid];
+					if(findSubstringInsensitive(obj->getName(), searchQueryString)){
+						results.emplace_back(oid, obj->getName());
+					}
+				}
+			} else if(_displayMode == OneTexture){
+				for(size_t oid = 0; oid < _age->textures().size(); ++oid){
+					const auto & texName = _age->textures()[oid];
+					if(findSubstringInsensitive(texName, searchQueryString)){
+						results.emplace_back(oid, texName);
+					}
+				}
+			}
+			
+			Log::Info() << "Found " << results.size() << " results" << (results.empty() ? "." : ":") << std::endl;
+			for(const auto & result : results){
+				Log::Info() << result.second << " (" << result.first << ")" << std::endl;
 			}
 		}
 		
 		ImGui::BeginChild("List", ImVec2(0,500), true);
-		for(size_t oid = 0; oid < _age->objects().size(); ++oid){
-			auto & object = _age->objects()[oid];
-			
-			if(ImGui::Selectable(object->getName().c_str(), &object->enabled)){
-				if(!multipleSelection){
-					// Disable all other elements.
-					for(size_t doid = 0; doid < oid; ++doid){
-						_age->objects()[doid]->enabled = false;
-					}
-					object->enabled = true;
-					for(size_t doid = oid+1; doid < _age->objects().size(); ++doid){
-						_age->objects()[doid]->enabled = false;
-					}
+		// If scene or object, display the list of objects.
+		if(_displayMode == Scene){
+			for(size_t oid = 0; oid < _age->objects().size(); ++oid){
+				auto & object = _age->objects()[oid];
+				ImGui::Selectable(object->getName().c_str(), &object->enabled);
+			}
+		} else if (_displayMode == OneObject){
+			for(size_t oid = 0; oid < _age->objects().size(); ++oid){
+				auto & object = _age->objects()[oid];
+				if(ImGui::Selectable(object->getName().c_str(), oid == _objectId)){
+					_objectId = oid;
 					//Reset the enabled sub object, etc.
-					subObjectId = layerId = -1;
+					_subObjectId = _subLayerId = -1;
+				}
+			}
+		} else if(_displayMode == OneTexture){
+			for(size_t oid = 0; oid < _age->textures().size(); ++oid){
+				auto & textureName = _age->textures()[oid];
+				if(ImGui::Selectable(textureName.c_str(), oid == _textureId)){
+					_textureId = oid;
 				}
 			}
 		}
 		ImGui::EndChild();
 		
-		ImGui::BeginChild("Details");
-		if(showObject){
-			const auto & obj = _age->objects()[objectId];
-			const ImGuiTreeNodeFlags parentFlags = 0 ;
-			const ImGuiTreeNodeFlags leafFlags = ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
-			
-			for(int soid = 0; soid < obj->subObjects().size(); ++soid){
-				const auto & subobj = obj->subObjects()[soid];
-				if(ImGui::TreeNodeEx((void*)(intptr_t)soid, parentFlags, "Subobject %i", soid)){
-					for(const auto & layer : subobj->material->getLayers()){
-						if(ImGui::TreeNodeEx(layer->getName().c_str(), parentFlags, "%s", layer->getName().c_str())){
-							
-							plLayerInterface * lay = plLayerInterface::Convert(layer->getObj());
-							const std::string logString = logLayer(lay);
-							//ImGui::TreeNodeEx(logString.c_str(), leafFlags);
-							ImGui::TextWrapped("%s", logString.c_str());
-							
-							ImGui::TreePop();
-						}
-						
-					}
-					ImGui::TreePop();
-				}
-			}
-			if(ImGui::InputInt("Subobject ID", &subObjectId)){
-				subObjectId = std::min(std::max(subObjectId,-1), (int)_age->objects()[objectId]->subObjects().size()-1);
-				layerId = -1;
-			}
-			if(ImGui::InputInt("Layer ID", &layerId)){
-				layerId = std::min(std::max(layerId,-1), (int)_age->objects()[objectId]->subObjects()[subObjectId]->material->getLayers().size()-1);
+		// Also display basic ID selectors.
+		if(_displayMode == OneObject){
+			if(ImGui::InputInt("Object ID", &_objectId)){
+				_objectId = std::min(std::max(_objectId,0), (int)_age->objects().size()-1);
+				_subObjectId = -1;
+				_subLayerId = -1;
 			}
 			
+			if(ImGui::InputInt("Part ID", &_subObjectId)){
+				_subObjectId = std::min(std::max(_subObjectId, -1), (int)_age->objects()[_objectId]->subObjects().size()-1);
+				_subLayerId = -1;
+			}
+			
+			if(ImGui::InputInt("Layer ID", &_subLayerId)){
+				_subLayerId = std::min(std::max(_subLayerId,-1), (int)_age->objects()[_objectId]->subObjects()[_subObjectId]->material->getLayers().size()-1);
+			}
+		} else if(_displayMode == OneTexture){
+			if(ImGui::InputInt("Texture ID", &_textureId)){
+				_textureId = std::min(std::max(_textureId,0), (int)_age->textures().size()-1);
+			}
 		}
-		ImGui::EndChild();
+		
 	}
 	ImGui::End();
-	
-	bool firstObjectEnabled = true;
-	showObject = false;
-	for(size_t oid = 0; oid < _age->objects().size(); ++oid){
-		if(_age->objects()[oid]->enabled){
-			if(!firstObjectEnabled){
-				showObject = false;
-				break;
-			}
-			firstObjectEnabled = false;
-			objectId = oid;
-			showObject = true;
+
+	// Display the texture fullscreen.
+	// TODO: handle aspect ratio.
+	if( _displayMode == OneTexture){
+		glEnable(GL_CULL_FACE);
+		glDisable(GL_DEPTH_TEST);
+		glClear(GL_COLOR_BUFFER_BIT);
+		glViewport(0,0, _config.screenResolution[0], _config.screenResolution[1]);
+		if(_textureId < _age->textures().size()){
+			const auto & texInfos = Resources::manager().getTexture(_age->textures()[_textureId]);
+			const glm::vec2 resolutionTexture(texInfos.width, texInfos.height);
+			_quad.draw(texInfos.id, resolutionTexture/_config.screenResolution);
 		}
-	}
-	
-	
-	
-	//ImGui::ShowTestWindow();
-	if(showTextures){
-		_quad.draw(Resources::manager().getTexture(_age->textures()[textureId]).id);
 		return;
 	}
 	
+	
+	_sceneFramebuffer->bind();
+	
+	glViewport(0, 0, GLsizei(_renderResolution[0]), GLsizei(_renderResolution[1]));
+	glClearColor(0.45f,0.45f, 0.5f, 1.0f);
+	glClearDepth(1.0f);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	
+	
 	glEnable(GL_DEPTH_TEST);
 	checkGLError();
-	if(showObject){
-		const auto objectToShow = _age->objects()[objectId];
-		
-		if(wireframe){
-			objectToShow->drawDebug(_camera.view() , _camera.projection(), subObjectId);
-		} else {
-			objectToShow->draw(_camera.view() , _camera.projection(), subObjectId, layerId);
+	if(_displayMode == OneObject){
+		if(_objectId < _age->objects().size()){
+			const auto objectToShow = _age->objects()[_objectId];
+			if(_wireframe){
+				objectToShow->drawDebug(_camera.view() , _camera.projection(), _subObjectId);
+			} else {
+				objectToShow->draw(_camera.view() , _camera.projection(), _subObjectId, _subLayerId);
+			}
 		}
-		
 	} else {
+	
 		const glm::mat4 viewproj = _camera.projection() * _camera.view();
-		drawCount = 0;
+		_drawCount = 0;
 		auto objects = _age->objectsClone();
 		auto& camera = _camera;
 		
 		std::sort(objects.begin(), objects.end(), [&camera](const std::shared_ptr<Object> & leftObj, const std::shared_ptr<Object> & rightObj){
+			// We cheat for one object only, the sky, drawn first in all cases.
+			
+			if(leftObj->probablySky() && !rightObj->probablySky()){
+				return true;
+			}
+			if(rightObj->probablySky() && !leftObj->probablySky()){
+				return false;
+			}
 			// Billboard after non billboard, whatever the transparency state.
 			if(leftObj->billboard() && !rightObj->billboard()){
 				return false;
@@ -298,6 +366,7 @@ void Renderer::draw(){
 		});
 		
 		// Rendering order:
+		// skybox first.
 		// opaque objects from closest to furthest.
 		// transparent objects (subojects?) from furthest to closest (maybe at least use the bounding box of the transparent subojects.
 		// billboards are after the transparent objects.
@@ -306,28 +375,30 @@ void Renderer::draw(){
 			if(!object->enabled){
 				continue;
 			}
-			if(doCulling &&
-			   (glm::length2(object->getCenter() - _camera.getPosition()) > cullingDistance*cullingDistance ||
-				// !object->isVisible(_camera.getPosition(), _camera.getDirection()) || (
+			// Cull based on distance and bounding box vs camera frustum.
+			if(_doCulling && !object->probablySky() &&
+			   (glm::length2(object->getCenter() - _camera.getPosition()) > _cullingDistance*_cullingDistance ||
 				 !object->isVisible(_camera.getPosition(), viewproj)
 				)){
 				continue;
 			}
-			++drawCount;
-			if(wireframe){
+			if(_wireframe){
 				object->drawDebug(_camera.view() , _camera.projection());
 			} else {
 				object->draw(_camera.view() , _camera.projection());
 			}
+			++_drawCount;
 		}
-	}
 	
+	}
+
+	
+	// Render the camera cursor.
 	const float scale = glm::length(_camera.getDirection());
 	const glm::mat4 MVP = _camera.projection() * _camera.view() * glm::scale(glm::translate(glm::mat4(1.0f), _camera.getCenter()), glm::vec3(0.015f*scale));
 	const auto debugProgram = Resources::manager().getProgram("camera-center");
 	const auto debugObject = Resources::manager().getMesh("sphere");
 	
-	// Render the camera cursor.
 	glDisable(GL_BLEND);
 	glEnable(GL_DEPTH_TEST);
 	glDisable(GL_CULL_FACE);
@@ -338,33 +409,46 @@ void Renderer::draw(){
 	glUniform2f(debugProgram->uniform("screenSize"), _config.screenResolution[0], _config.screenResolution[1]);
 	glDrawElements(GL_TRIANGLES, debugObject.count, GL_UNSIGNED_INT, (void*)0);
 	
-	
 	// Reset state.
 	glBindVertexArray(0);
 	glUseProgram(0);
 	glEnable(GL_CULL_FACE);
 	glDisable(GL_DEPTH_TEST);
 	
+	_sceneFramebuffer->unbind();
+	
+	glViewport(0,0, _config.screenResolution[0], _config.screenResolution[1]);
+	(_wireframe ? _quad : _fxaaquad).draw(_sceneFramebuffer->textureId(), 1.0f/_config.screenResolution);
+	
 	checkGLError();
 }
 
 void Renderer::loadAge(const std::string & path){
-	Log::Info() << "Should load " << path << std::endl;
+	Log::Info() << "Loading " << path << "..." << std::endl;
 	Resources::manager().reset();
+	_displayMode = Scene;
+	_objectId = 0;
+	_textureId = 0;
+	_subObjectId = -1;
+	_subLayerId = -1;
 	_age.reset(new Age(path));
 	// A Uru human is around 4/5 units in height apparently.
 	_camera.setCenter(_age->getDefaultLinkingPoint());
-	//_maxLayer = std::max(_maxLayer, _age->maxLayer());
 }
 void Renderer::update(){
 	if(Input::manager().resized()){
 		resize((int)Input::manager().size()[0], (int)Input::manager().size()[1]);
 	}
-	_camera.update();
+	
+	if(_displayMode != OneTexture){
+		_camera.update();
+	}
 }
 
 void Renderer::physics(double fullTime, double frameTime){
-	_camera.physics(frameTime);
+	if(_displayMode != OneTexture){
+		_camera.physics(frameTime);
+	}
 }
 
 /// Clean function
@@ -385,7 +469,8 @@ void Renderer::updateResolution(int width, int height){
 	_config.screenResolution[0] = float(width > 0 ? width : 1);
 	_config.screenResolution[1] = float(height > 0 ? height : 1);
 	// Same aspect ratio as the display resolution
-	_renderResolution = (_config.internalVerticalResolution/_config.screenResolution[1]) * _config.screenResolution;
+	_renderResolution = (_resolutionScaling/100.0f ) * _config.screenResolution;
+	_sceneFramebuffer->resize(_renderResolution[0], _renderResolution[1]);
 }
 
 void Renderer::defaultGLSetup(){
