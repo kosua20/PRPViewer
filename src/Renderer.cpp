@@ -31,7 +31,9 @@ Renderer::Renderer(Config & config) : _config(config) {
 	_quad.init("passthrough");
 	_fxaaquad.init("fxaa");
 	// Setup camera parameters.
-	_camera.projection(config.screenResolution[0]/config.screenResolution[1], 1.3f, 0.1f, 8000.0f);
+	_cameraFarPlane = 8000.0f;
+	_cameraFOV = 1.3f;
+	_camera.projection(config.screenResolution[0]/config.screenResolution[1], _cameraFOV, 0.1f, _cameraFarPlane);
 	
 	_sceneFramebuffer = std::make_shared<Framebuffer>(_renderResolution[0], _renderResolution[1], GL_RGB, GL_UNSIGNED_BYTE, GL_RGB8, GL_LINEAR, GL_CLAMP_TO_EDGE, true);
 	
@@ -41,7 +43,7 @@ Renderer::Renderer(Config & config) : _config(config) {
 	Resources::manager().getProgram("object_special")->registerTexture("cubemaps", 1);
 	Resources::manager().getProgram("object_special")->registerTexture("textures1", 2);
 	
-	std::vector<std::string> files = ImGui::listFiles("../../../data/mystv/", false, false, {"age"});
+	std::vector<std::string> files = ImGui::listFiles("./", false, false, {"age"});
 	
 	_age = std::make_shared<Age>();
 	_resolutionScaling = 100.0f;
@@ -53,6 +55,8 @@ Renderer::Renderer(Config & config) : _config(config) {
 void Renderer::draw(){
 	
 	// Infos window.
+	ImGui::SetNextWindowPos(ImVec2(0,220), ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowSize(ImVec2(270,460), ImGuiCond_FirstUseEver);
 	if (ImGui::Begin("Infos")) {
 		ImGui::Text("%2.1f FPS (%2.1f ms)", ImGui::GetIO().Framerate, ImGui::GetIO().DeltaTime*1000.0f);
 		ImGui::Text("Age: %s", (_age->getName().c_str()));
@@ -94,8 +98,10 @@ void Renderer::draw(){
 	ImGui::End();
 	
 	
-#define DEFAULT_WIDTH 160
+	#define DEFAULT_WIDTH 160
 	
+	ImGui::SetNextWindowPos(ImVec2(0,0), ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowSize(ImVec2(270,220), ImGuiCond_FirstUseEver);
 	if (ImGui::Begin("Settings")) {
 		static int current_item_id = 0;
 		
@@ -146,15 +152,27 @@ void Renderer::draw(){
 			_resolutionScaling = std::min(std::max(_resolutionScaling, 10.0f), 200.0f);
 			updateResolution(_config.screenResolution[0], _config.screenResolution[1]);
 		}
+		if(ImGui::SliderFloat("Far plane", &_cameraFarPlane, 0.1f, 15000.0f, "%.3f", 2.0f)){
+			_camera.frustum(0.1f, _cameraFarPlane);
+		}
+		if(ImGui::SliderFloat("Field of view", &_cameraFOV, 0.1f, 3.0f)){
+			_camera.fov(_cameraFOV);
+		}
 		ImGui::PopItemWidth();
 		
 	}
 	ImGui::End();
 	
 	// Display the log window.
+	
+	
+	ImGui::SetNextWindowPos(ImVec2(0,680), ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowSize(ImVec2(869,180), ImGuiCond_FirstUseEver);
 	Log::Info().display();
 	
 	
+	ImGui::SetNextWindowPos(ImVec2(870,0), ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowSize(ImVec2(330,852), ImGuiCond_FirstUseEver);
 	if(ImGui::Begin("Listing")){
 		
 		ImGui::Combo("Mode", (int*)(&_displayMode), "Scene\0Object\0Texture\0\0");
@@ -227,7 +245,7 @@ void Renderer::draw(){
 			}
 		}
 		
-		ImGui::BeginChild("List", ImVec2(0,500), true);
+		ImGui::BeginChild("List", ImVec2(0,-80), true);
 		// If scene or object, display the list of objects.
 		if(_displayMode == Scene){
 			for(size_t oid = 0; oid < _age->objects().size(); ++oid){
@@ -287,8 +305,8 @@ void Renderer::draw(){
 		glViewport(0,0, _config.screenResolution[0], _config.screenResolution[1]);
 		if(_textureId < _age->textures().size()){
 			const auto & texInfos = Resources::manager().getTexture(_age->textures()[_textureId]);
-			const glm::vec2 resolutionTexture(texInfos.width, texInfos.height);
-			_quad.draw(texInfos.id, resolutionTexture/_config.screenResolution);
+			//const glm::vec2 resolutionTexture(texInfos.width, texInfos.height);
+			_quad.draw(texInfos.id);
 		}
 		return;
 	}

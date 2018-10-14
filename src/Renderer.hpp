@@ -56,6 +56,8 @@ private:
 	float _cullingDistance = 1500.0f;
 	int _drawCount = 0;
 	bool _forceLighting = false;
+	float _cameraFarPlane;
+	float _cameraFOV;
 	
 	enum DisplayMode {
 		Scene = 0, OneObject = 1, OneTexture = 2
