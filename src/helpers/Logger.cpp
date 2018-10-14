@@ -1,9 +1,62 @@
 #include "Logger.hpp"
+#include <PRP/Geometry/plDrawableSpans.h>
 #include <imgui/imgui.h>
 #include <ctime>
 #include <iomanip>
 #include <iostream>
 
+
+void logSpanProps(unsigned int iceflags){
+	if(iceflags!=0){
+		Log::Info() << "Span flags: ";
+		if(iceflags & plSpan::kLiteMaterial){ Log::Info() << "kLiteMaterial" << ", "; }
+		if(iceflags & plSpan::kPropNoDraw){ Log::Info() << "kPropNoDraw" << ", "; }
+		if(iceflags & plSpan::kPropNoShadowCast){ Log::Info() << "kPropNoShadowCast" << ", "; }
+		if(iceflags & plSpan::kPropFacesSortable){ Log::Info() << "kPropFacesSortable" << ", "; }
+		if(iceflags & plSpan::kPropVolatile){ Log::Info() << "kPropVolatile" << ", "; }
+		if(iceflags & plSpan::kWaterHeight){ Log::Info() << "kWaterHeight" << ", "; }
+		if(iceflags & plSpan::kPropRunTimeLight){ Log::Info() << "kPropRunTimeLight" << ", "; }
+		if(iceflags & plSpan::kPropReverseSort){ Log::Info() << "kPropReverseSort" << ", "; }
+		if(iceflags & plSpan::kPropHasPermaLights){ Log::Info() << "kPropHasPermaLights" << ", "; }
+		if(iceflags & plSpan::kPropHasPermaProjs){ Log::Info() << "kPropHasPermaProjs" << ", "; }
+		if(iceflags & plSpan::kLiteVtxPreshaded){ Log::Info() << "kLiteVtxPreshaded" << ", "; }
+		if(iceflags & plSpan::kLiteVtxNonPreshaded){ Log::Info() << "kLiteVtxNonPreshaded" << ", "; }
+		if(iceflags & plSpan::kLiteProjection){ Log::Info() << "kLiteProjection" << ", "; }
+		if(iceflags & plSpan::kLiteShadowErase){ Log::Info() << "kLiteShadowErase" << ", "; }
+		if(iceflags & plSpan::kLiteShadow){ Log::Info() << "kLiteShadow" << ", "; }
+		if(iceflags & plSpan::kPropMatHasSpecular){ Log::Info() << "kPropMatHasSpecular" << ", "; }
+		if(iceflags & plSpan::kPropProjAsVtx){ Log::Info() << "kPropProjAsVtx" << ", "; }
+		if(iceflags & plSpan::kPropSkipProjection){ Log::Info() << "kPropSkipProjection" << ", "; }
+		if(iceflags & plSpan::kPropNoShadow){ Log::Info() << "kPropNoShadow" << ", "; }
+		if(iceflags & plSpan::kPropForceShadow){ Log::Info() << "kPropForceShadow" << ", "; }
+		if(iceflags & plSpan::kPropDisableNormal){ Log::Info() << "kPropDisableNormal" << ", "; }
+		if(iceflags & plSpan::kPropCharacter){ Log::Info() << "kPropCharacter" << ", "; }
+		if(iceflags & plSpan::kPartialSort){ Log::Info() << "kPartialSort" << ", "; }
+		if(iceflags & plSpan::kVisLOS){ Log::Info() << "kVisLOS" << ", "; }
+		Log::Info() << std::endl;
+	}
+}
+
+void logCompFlags(unsigned int cflags){
+	if(cflags!=0){
+		Log::Info() << "\tCompflags: ";
+		if(cflags & hsGMaterial::kCompShaded){ Log::Info() << "kCompShaded" << ", ";}
+		if(cflags & hsGMaterial::kCompEnvironMap){ Log::Info() << "kCompEnvironMap" << ", ";}
+		if(cflags & hsGMaterial::kCompProjectOnto){ Log::Info() << "kCompProjectOnto" << ", ";}
+		if(cflags & hsGMaterial::kCompSoftShadow){ Log::Info() << "kCompSoftShadow" << ", ";}
+		if(cflags & hsGMaterial::kCompSpecular){ Log::Info() << "kCompSpecular" << ", ";}
+		if(cflags & hsGMaterial::kCompTwoSided){ Log::Info() << "kCompTwoSided" << ", ";}
+		if(cflags & hsGMaterial::kCompDrawAsSplats){ Log::Info() << "kCompDrawAsSplats" << ", ";}
+		if(cflags & hsGMaterial::kCompAdjusted){ Log::Info() << "kCompAdjusted" << ", ";}
+		if(cflags & hsGMaterial::kCompNoSoftShadow){ Log::Info() << "kCompNoSoftShadow" << ", ";}
+		if(cflags & hsGMaterial::kCompDynamic){ Log::Info() << "kCompDynamic" << ", ";}
+		if(cflags & hsGMaterial::kCompDecal){ Log::Info() << "kCompDecal" << ", ";}
+		if(cflags & hsGMaterial::kCompIsEmissive){ Log::Info() << "kCompIsEmissive" << ", ";}
+		if(cflags & hsGMaterial::kCompIsLightMapped){ Log::Info() << "kCompIsLightMapped" << ", ";}
+		if(cflags & hsGMaterial::kCompNeedsBlendChannel){ Log::Info() << "kCompNeedsBlendChannel" << ", ";}
+		Log::Info() << std::endl;
+	}
+}
 
 std::string logLayer(plLayerInterface * lay){
 	std::string layerString;
@@ -244,9 +297,8 @@ void Log::flush(){
 			_file << finalStr << std::flush;
 		}
 		
-		if(_level != LogLevel::INFO){
-			_fullLog.append(finalStr);
-		}
+		_fullLog.append(finalStr);
+		
 	}
 	_ignoreUntilFlush = false;
 	_appendPrefix = false;

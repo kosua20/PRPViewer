@@ -15,10 +15,13 @@ Object::Object(const Type & type, std::shared_ptr<ProgramInfos> prog, const glm:
 	enabled = true;
 	_transparent = false;
 	_billboard = false;
+	_centroid = glm::vec3(0.0f);
 	
 	if(_type == Billboard || _type == BillboardY){
 		_billboard = true;
 	}
+	
+	_probablySky = (name.find("sky") != std::string::npos || name.find("Sky") != std::string::npos);
 }
 
 Object::~Object() {}
@@ -30,9 +33,11 @@ void Object::addSubObject(const MeshInfos & infos, hsGMaterial * material, const
 	} else {
 		_localBounds += infos.bbox;
 	}
-	
 	_localBounds.updateValues();
 	_globalBounds = _localBounds.transform(_model);
+	// That's not very accurate, but simpler.
+	_centroid = (float(_subObjects.size()) * _centroid + infos.centroid) / (_subObjects.size()+1.0f);
+	
 	// Check if subobject is transparent.
 	bool isAlphaBlend = false;
 	if(!material->getLayers().empty()){
@@ -59,8 +64,6 @@ void Object::addSubObject(const MeshInfos & infos, hsGMaterial * material, const
 	//}
 	
 }
-
-
 
 const bool Object::isVisible(const glm::vec3 & point, const glm::mat4 & viewproj) const {
 	return _globalBounds.contains(point) || _globalBounds.intersectsFrustum(viewproj);
@@ -111,7 +114,6 @@ void Object::drawDebug(const glm::mat4& view, const glm::mat4& projection, const
 	}
 	
 	if(_type != Billboard && _type != BillboardY){
-		// TODO: take barycenter of vertices instead.
 		const auto center = _globalBounds.center;
 		const auto scale = _globalBounds.getScale()*0.5f;
 		glm::mat4 iden = glm::scale(glm::translate(glm::mat4(1.0f), center), scale);
@@ -141,6 +143,7 @@ void Object::draw(const glm::mat4& view, const glm::mat4& projection, const int 
 			viewCopy[1][1] = 1.0;
 			viewCopy[1][2] = 0.0;
 		}
+		// TODO: seems hacky.
 		MV = view * glm::translate(glm::mat4(1.0f), glm::vec3(_model[3][0],_model[3][1],_model[3][2])) * viewCopy  * glm::scale(glm::mat4(1.0f), glm::vec3(_model[0][0]));
 	}
 	const glm::mat4 MVP = projection * MV;
@@ -169,7 +172,11 @@ void Object::draw(const glm::mat4& view, const glm::mat4& projection, const int 
 		if(!subObject->material){
 			continue;
 		}
-		if(subObject->material->getLayers().size() == 1 && !plLayerInterface::Convert(subObject->material->getLayers()[0]->getObj(), false)->getTexture().Exists()){
+	
+		const auto * layObj = plLayerInterface::Convert(subObject->material->getLayers()[0]->getObj(), false);
+		const bool hasTexture = layObj->getTexture().Exists();
+		const bool hasUnderlay = layObj->getUnderLay().Exists();
+		if(subObject->material->getLayers().size() == 1 && !hasTexture && !hasUnderlay){
 			continue;
 		}
 		   
@@ -203,8 +210,8 @@ void Object::draw(const glm::mat4& view, const glm::mat4& projection, const int 
 			// TODO: cache this at load time?
 			if(tid < subObject->material->getLayers().size()-1){
 				
-				const bool restartBindNext = (lay->getState().fMiscFlags & hsGMatState::kMiscBindNext) && (lay->getState().fMiscFlags & hsGMatState::kMiscRestartPassHere);
-				
+				const bool restartBindNext = (lay->getState().fMiscFlags & hsGMatState::kMiscBindNext) ;
+				//&& (lay->getState().fMiscFlags & hsGMatState::kMiscRestartPassHere)
 				if(restartBindNext){
 					plLayerInterface * layNext = plLayerInterface::Convert(subObject->material->getLayers()[tid+1]->getObj(), false);
 					const bool nextIsAlphaBlend = (layNext->getState().fBlendFlags & hsGMatState::kBlendAlphaMult) && (layNext->getState().fBlendFlags & hsGMatState::kBlendNoTexColor);
@@ -221,7 +228,7 @@ void Object::draw(const glm::mat4& view, const glm::mat4& projection, const int 
 						++tid;
 						continue;
 					} else {
-						Log::Warning() << "Can this case arise?" << std::endl;
+						//Log::Warning() << "Can this case arise?" << std::endl;
 					}
 				}
 			}
@@ -450,7 +457,7 @@ void Object::blendState(const std::shared_ptr<ProgramInfos> & program, plLayerIn
 		if (bflags & hsGMatState::kBlendAlphaTestHigh) {
 			glUniform1f(program->uniform("alphaThreshold"), 40.0f/255.0f);
 		} else {
-			glUniform1f(program->uniform("alphaThreshold"), 1.0f/255.0f);
+			glUniform1f(program->uniform("alphaThreshold"), 2.0f/255.0f);
 		}
 	} else {
 		glUniform1f(program->uniform("alphaThreshold"), 0.f);
@@ -489,7 +496,6 @@ void Object::textureState(const std::shared_ptr<ProgramInfos> & program, plLayer
 		}
 		
 	} else {
-		//infos = Resources::manager().getTexture("");
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, 0);
 		glUniform1i(program->uniform("useTexture"), 0);

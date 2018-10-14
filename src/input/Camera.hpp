@@ -48,6 +48,8 @@ public:
 	
 	const glm::vec3 getDirection() const { return _center - _eye;  } // Dont care about normalization for now.
 	
+	float & speed(){ return _speed; }
+	
 private:
 	
 	void updateUsingJoystick(double frameTime);

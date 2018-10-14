@@ -41,9 +41,6 @@ public:
 	
 	void addSubObject(const MeshInfos & infos, hsGMaterial * material, const unsigned int shadingMode);
 	
-	/// Update function
-	//void update(const glm::mat4& model);
-	
 	/// Draw function
 	void drawDebug(const glm::mat4& view, const glm::mat4& projection, const int subObject = -1) const;
 	
@@ -70,6 +67,8 @@ public:
 	
 	const bool billboard(){ return _billboard; }
 	
+	const bool probablySky(){ return _probablySky; }
+	
 private:
 	
 	void renderLayer(const std::shared_ptr<SubObject> & subObject, plLayerInterface * lay, const int tid) const;
@@ -92,8 +91,10 @@ private:
 	BoundingBox _localBounds;
 	BoundingBox _globalBounds;
 	
+	glm::vec3 _centroid;
 	bool _transparent;
 	bool _billboard;
+	bool _probablySky;
 };
 
 #endif

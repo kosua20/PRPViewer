@@ -12,7 +12,11 @@ class plLocation;
 
 class Age {
 public:
+	
+	Age();
+	
 	Age(const std::string & path);
+	
 	~Age();
 	
 	const std::string& getName(){

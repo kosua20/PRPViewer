@@ -178,9 +178,9 @@ TextureInfos GLUtilities::loadTexture(const plMipmap * textureData){
 		// Regular format.
 		// TODO: check PNG and other are handled correctly.
 		const unsigned short bflags = textureData->getARGBType();
-		const GLenum format = (bflags == plBitmap::kInten8) ? GL_RED : (bflags == plBitmap::kAInten88 ? GL_RG : GL_RGBA);
+		const GLenum format = (bflags == plBitmap::kInten8) ? GL_RED : (bflags == plBitmap::kAInten88 ? GL_RG : GL_BGRA);
 		const GLenum type = GL_UNSIGNED_BYTE;
-		const GLenum preciseFormat = format;
+		const GLenum preciseFormat = (bflags == plBitmap::kInten8) ? GL_RED : (bflags == plBitmap::kAInten88 ? GL_RG : GL_RGBA);
 		
 		for(unsigned int mipid = 0; mipid < mipmapCount; ++mipid){
 			glTexImage2D(GL_TEXTURE_2D, mipid, preciseFormat, textureData->getLevelWidth(mipid), textureData->getLevelHeight(mipid), 0, format, type, textureData->getLevelData(mipid));

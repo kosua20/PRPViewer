@@ -155,8 +155,9 @@ struct MeshInfos {
 	GLsizei count;
 	size_t uvCount;
 	BoundingBox bbox;
+	glm::vec3 centroid;
 	
-	MeshInfos() : vId(0), eId(0), count(0), uvCount(0), bbox(glm::vec3(0.0f), glm::vec3(0.0f)) {}
+	MeshInfos() : vId(0), eId(0), count(0), uvCount(0), bbox(glm::vec3(0.0f), glm::vec3(0.0f)), centroid(0.0f) {}
 
 };
 

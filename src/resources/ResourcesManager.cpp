@@ -245,13 +245,16 @@ const MeshInfos Resources::registerMesh(const std::string & name, const std::vec
 	//MeshUtilities::computeTangentsAndBinormals(mesh);
 	//MeshUtilities::centerAndUnitMesh(mesh);
 	infos = GLUtilities::setupBuffers(mesh);
+	infos.centroid = glm::vec3(0.0f);
 	
 	if(!positions.empty()){
 		infos.bbox = BoundingBox(positions[0], positions[0]);
 		for(const auto & pos : positions){
 			infos.bbox += pos;
+			infos.centroid += pos;
 		}
 		infos.bbox.updateValues();
+		infos.centroid /= positions.size();
 	}
 	
 	_meshes[name] = infos;

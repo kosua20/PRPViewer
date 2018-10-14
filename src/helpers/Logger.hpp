@@ -12,12 +12,16 @@
 #include <Sys/hsColor.h>
 #include <PRP/Surface/plLayerInterface.h>
 
-std::string logLayer(plLayerInterface * lay);
-
 // Fix for Windows headers.
 #ifdef ERROR
 #undef ERROR
 #endif
+
+// Basic log helpers for Plasma structures.
+void logSpanProps(unsigned int iceflags);
+void logCompFlags(unsigned int cflags);
+std::string logLayer(plLayerInterface * lay);
+
 class Log {
 	
 public:
