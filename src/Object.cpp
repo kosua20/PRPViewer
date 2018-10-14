@@ -88,7 +88,8 @@ void Object::drawDebug(const glm::mat4& view, const glm::mat4& projection, const
 			viewCopy[1][1] = 1.0;
 			viewCopy[1][2] = 0.0;
 		}
-		MV = view * glm::translate(glm::mat4(1.0f), glm::vec3(_model[3][0],_model[3][1],_model[3][2])) * viewCopy  * glm::scale(glm::mat4(1.0f), glm::vec3(_model[0][0]));
+		const float scaleBoard = std::max(std::max(std::abs(_model[0][0]),std::abs(_model[1][1])), std::abs(_model[2][2]));
+		MV = view * glm::translate(glm::mat4(1.0f), glm::vec3(_model[3][0],_model[3][1],_model[3][2])) * viewCopy  * glm::scale(glm::mat4(1.0f), glm::vec3(scaleBoard));
 	}
 	const glm::mat4 MVP = projection * MV;
 	const auto debugProgram = Resources::manager().getProgram("wireframe");
@@ -143,8 +144,8 @@ void Object::draw(const glm::mat4& view, const glm::mat4& projection, const int 
 			viewCopy[1][1] = 1.0;
 			viewCopy[1][2] = 0.0;
 		}
-		// TODO: seems hacky.
-		MV = view * glm::translate(glm::mat4(1.0f), glm::vec3(_model[3][0],_model[3][1],_model[3][2])) * viewCopy  * glm::scale(glm::mat4(1.0f), glm::vec3(_model[0][0]));
+		const float scaleBoard = std::max(std::max(std::abs(_model[0][0]),std::abs(_model[1][1])), std::abs(_model[2][2]));
+		MV = view * glm::translate(glm::mat4(1.0f), glm::vec3(_model[3][0],_model[3][1],_model[3][2])) * viewCopy  * glm::scale(glm::mat4(1.0f), glm::vec3(scaleBoard));
 	}
 	const glm::mat4 MVP = projection * MV;
 	const glm::mat4 invV = glm::inverse(view);
