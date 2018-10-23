@@ -24,7 +24,6 @@
 #include <string_theory/stdio>
 #include <cstring>
 #include <time.h>
-#include <unistd.h>
 #include <fstream>
 
 unsigned int  kLiteMask = (plSpan::kLiteMaterial | plSpan::kLiteVtxPreshaded | plSpan::kLiteVtxNonPreshaded | plSpan::kLiteProjection | plSpan::kLiteShadowErase | plSpan::kLiteShadow);
