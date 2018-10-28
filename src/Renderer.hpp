@@ -58,7 +58,7 @@ private:
 	bool _forceLighting = false;
 	float _cameraFarPlane;
 	float _cameraFOV;
-	
+	float _clearColor[3];
 	enum DisplayMode {
 		Scene = 0, OneObject = 1, OneTexture = 2
 	};
