@@ -152,8 +152,8 @@ void main(){
 				break;
 		}
 			
-		coords.x = clampedTexture.x ? clamp(coords.x, 0.01, 0.99) : coords.x;
-		coords.y = clampedTexture.y ? clamp(coords.y, 0.01, 0.99) : coords.y;
+		coords.x = clampedTexture.x ? clamp(coords.x, 0.0, 0.99) : coords.x;
+		coords.y = clampedTexture.y ? clamp(coords.y, 0.0, 0.99) : coords.y;
 		
 			
 		Out.uv = coords.xyz;

@@ -69,7 +69,7 @@ add_executable(PrpViewer ${SOURCE_FILES})
 
 add_dependencies(PrpViewer libhsplasmaext)
 target_link_libraries(PrpViewer ${PNG_LIBRARIES} ${JPEG_LIBRARIES} ${ZLIB_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${STRING_THEORY_LIBRARIES} ${HSPLASMA_LIB} )
-target_link_libraries(PrpViewer glfw ${Boost_FILESYSTEM_LIBRARY} ${Boost_SYSTEM_LIBRARY})
+target_link_libraries(PrpViewer glfw ${Boost_SYSTEM_LIBRARY} ${Boost_FILESYSTEM_LIBRARY} )
 if(APPLE)
 	target_link_libraries(PrpViewer ${CORE_FOUNDATION})
 endif()
