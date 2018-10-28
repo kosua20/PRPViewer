@@ -68,6 +68,9 @@ Age::Age(const std::string & path){
 	
 	checkGLError();
 	Log::Info() << _objects.size() << " objects."  << std::endl;
+	std::sort(_objects.begin(), _objects.end(), [](const std::shared_ptr<Object> & left, const std::shared_ptr<Object> & right){
+		return left->getName() < right->getName();
+	});
 }
 
 Age::~Age(){
@@ -75,6 +78,11 @@ Age::~Age(){
 		obj->clean();
 	}
 	// Should clean the Age and everything.
+	_objects.clear();
+	if(_rm){
+		_rm->UnloadAge(_name);
+	}
+	
 }
 
 
@@ -147,19 +155,24 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 				// A span group multiple objects data/assets.
 				plDrawableSpans* span = plDrawableSpans::Convert(draw->getDrawable(i)->getObj());
 				plDISpanIndex di = span->getDIIndex(draw->getDrawableKey(i));
+				// Fog color.
+				Log::Unmute();
+				const size_t numSpans = span->getNumSpans();
+				for(size_t spid = 0; spid <numSpans; ++spid){
+					if(span->getSpan(spid)->getFogEnvironment().Exists()){
+						plFogEnvironment* fog = plFogEnvironment::Convert(span->getSpan(0)->getFogEnvironment()->getObj());
+						Log::Info() << "Fog: " << fog->getColor() << std::endl;
+					}
+				}
 				
+				
+				Log::Mute();
 				// Ignore matrix-only span element.
 				if ((di.fFlags & plDISpanIndex::kMatrixOnly) != 0){
 					continue;
 				}
 				
-				// Fog color.
-				Log::Unmute();
-				if(span->getSpan(0)->getFogEnvironment().Exists()){
-					plFogEnvironment* fog = plFogEnvironment::Convert(span->getSpan(0)->getFogEnvironment()->getObj());
-					Log::Info() << fog->getColor() << std::endl;
-				}
-				Log::Mute();
+				
 				
 				// Each of these will be a subobject.
 				for(size_t id = 0; id < di.fIndices.size(); ++id){
