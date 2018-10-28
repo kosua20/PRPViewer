@@ -42,10 +42,17 @@ void Object::addSubObject(const MeshInfos & infos, hsGMaterial * material, const
 	bool isAlphaBlend = false;
 	if(!material->getLayers().empty()){
 		const auto & layKey = material->getLayers()[0];
-		// Obtain the layer to aply.
+		// Obtain the layer to apply.
 		const plLayerInterface * lay = plLayerInterface::Convert(layKey->getObj(), false);
 		isAlphaBlend = lay->getState().fBlendFlags & hsGMatState::kBlendAlpha;
 		_transparent = _transparent || isAlphaBlend;
+		// Also check the underlay.
+		const bool hasUnderlay = lay->getUnderLay().Exists();
+		if(hasUnderlay){
+			const plLayerInterface * lay1 = plLayerInterface::Convert(lay->getUnderLay()->getObj(), false);
+			isAlphaBlend = lay1->getState().fBlendFlags & hsGMatState::kBlendAlpha;
+			_transparent = _transparent || isAlphaBlend;
+		}
 	}
 	auto newSubObject = std::make_shared<SubObject>(infos, material, shadingMode, isAlphaBlend);
 	
@@ -62,8 +69,8 @@ void Object::addSubObject(const MeshInfos & infos, hsGMaterial * material, const
 	//// Soid is the first transparent element, or the size.
 	//_subObjects.insert(_subObjects.begin()+soid, newSubObject);
 	//}
-	
 }
+
 
 const bool Object::isVisible(const glm::vec3 & point, const glm::mat4 & viewproj) const {
 	return _globalBounds.contains(point) || _globalBounds.intersectsFrustum(viewproj);
@@ -197,14 +204,25 @@ void Object::draw(const glm::mat4& view, const glm::mat4& projection, const int 
 				continue;
 			}
 			// Fix for non texture null state layers.
-			if(!lay->getTexture().Exists() && lay->getState().fMiscFlags == 0 && lay->getState().fBlendFlags == 0 && lay->getState().fZFlags == 0 && lay->getState().fShadeFlags == 0){
+			bool shouldStop = false;
+			while(!lay->getTexture().Exists() && lay->getState().fMiscFlags == 0 && lay->getState().fBlendFlags == 0 && lay->getState().fZFlags == 0 && lay->getState().fShadeFlags == 0 && !shouldStop){
 				
 				if(lay->getUnderLay().Exists()){
-					//Log::Info() << "Underlay: " << lay->getUnderLay()->getName() << std::endl;
+					// So we have a texture, but no infos on how to render it, and then an underlay?
+					// Smells like the vertex color hack.
+					// Where the underlay is used as an alpha map.
 					plLayerInterface * underlay = plLayerInterface::Convert(lay->getUnderLay()->getObj(), false);
-					renderLayer(subObject, underlay, tid);
-					//++tid;
+					lay = underlay;
+					// Just to be safe, let's replicate the same check here.
+					if((lay->getState().fMiscFlags & (hsGMatState::kMiscBumpDu | hsGMatState::kMiscBumpDv | hsGMatState::kMiscBumpDw | hsGMatState::kMiscBumpLayer | hsGMatState::kMiscBumpChans)) != 0){
+						shouldStop = true;
+					}
+				} else {
+					shouldStop = true;
 				}
+				
+			}
+			if(shouldStop){
 				continue;
 			}
 			
@@ -596,7 +614,7 @@ void Object::renderLayerMult(const std::shared_ptr<SubObject> & subObject, plLay
 
 
 void Object::clean() const {
-	
+	// Deleted in the Resources manager.
 }
 
 
