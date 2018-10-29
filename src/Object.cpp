@@ -229,8 +229,7 @@ void Object::draw(const glm::mat4& view, const glm::mat4& projection, const int 
 			// TODO: cache this at load time?
 			if(tid < subObject->material->getLayers().size()-1){
 				
-				const bool restartBindNext = (lay->getState().fMiscFlags & hsGMatState::kMiscBindNext) ;
-				//&& (lay->getState().fMiscFlags & hsGMatState::kMiscRestartPassHere)
+				const bool restartBindNext = (lay->getState().fMiscFlags & hsGMatState::kMiscBindNext) && (lay->getState().fMiscFlags & hsGMatState::kMiscRestartPassHere);
 				if(restartBindNext){
 					plLayerInterface * layNext = plLayerInterface::Convert(subObject->material->getLayers()[tid+1]->getObj(), false);
 					const bool nextIsAlphaBlend = (layNext->getState().fBlendFlags & hsGMatState::kBlendAlphaMult) && (layNext->getState().fBlendFlags & hsGMatState::kBlendNoTexColor);
@@ -248,6 +247,32 @@ void Object::draw(const glm::mat4& view, const glm::mat4& projection, const int 
 						continue;
 					} else {
 						//Log::Warning() << "Can this case arise?" << std::endl;
+					}
+				} else if(lay->getState().fMiscFlags & hsGMatState::kMiscBindNext){
+					plLayerInterface * layNext = plLayerInterface::Convert(subObject->material->getLayers()[tid+1]->getObj(), false);
+					
+					// If the next one is a kMiscNoShadowAlpha, don't use it as an alpha.
+					// Just render the current layer as usual, and skip the next one even.
+					if(layNext->getState().fMiscFlags & hsGMatState::kMiscNoShadowAlpha){
+						renderLayer(subObject, lay, tid);
+						++tid;
+						continue;
+					}
+					// If we are alpha.
+					if((lay->getState().fBlendFlags & hsGMatState::kBlendMask) == hsGMatState::kBlendAlpha){
+						
+						// If the following conditions are met, it means that layer 1 is a better choice to
+						// get the transparency from. The specific case we're looking for is vertex alpha
+						// simulated by an invisible second layer alpha LUT (known as the alpha hack).
+				
+						if(!(layNext->getState().fBlendFlags & hsGMatState::kBlendNoTexAlpha) &&
+						   layNext->getTexture().Exists() && !(layNext->getState().fMiscFlags & hsGMatState::kMiscNoShadowAlpha)){
+							// In this case, best to use the next layer.
+							// TODO: make sure that we should'nt instead perform the blend in another way.
+							++tid;
+							continue;
+						}
+						
 					}
 				}
 			}
