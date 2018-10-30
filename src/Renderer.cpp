@@ -50,6 +50,9 @@ Renderer::Renderer(Config & config) : _config(config) {
 	_resolutionScaling = 100.0f;
 	//loadAge("../../../data/uru/spyroom.age");
 	_clearColor[0] = _clearColor[1] = _clearColor[2] = 0.5f;
+	_vertexOnly = false;
+	_forceNoLighting = false;
+	_forceLighting = false;
 }
 
 
@@ -57,8 +60,8 @@ Renderer::Renderer(Config & config) : _config(config) {
 void Renderer::draw(){
 	
 	// Infos window.
-	ImGui::SetNextWindowPos(ImVec2(0,250), ImGuiCond_FirstUseEver);
-	ImGui::SetNextWindowSize(ImVec2(270,460), ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowPos(ImVec2(0,270), ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowSize(ImVec2(270,410), ImGuiCond_FirstUseEver);
 	if (ImGui::Begin("Infos")) {
 		ImGui::Text("%2.1f FPS (%2.1f ms)", ImGui::GetIO().Framerate, ImGui::GetIO().DeltaTime*1000.0f);
 		ImGui::Text("Age: %s", (_age->getName().c_str()));
@@ -75,7 +78,8 @@ void Renderer::draw(){
 			
 			for(int soid = 0; soid < selectedObj->subObjects().size(); ++soid){
 				const auto & subobj = selectedObj->subObjects()[soid];
-				if(ImGui::TreeNodeEx((void*)(intptr_t)soid, parentFlags, "Subobject %i", soid)){
+				const std::string subObjName = "Subobject " + std::to_string(soid);
+				if(ImGui::TreeNodeEx(subObjName.c_str(), parentFlags, "%s", subObjName.c_str())){
 					for(const auto & layer : subobj->material->getLayers()){
 						if(ImGui::TreeNodeEx(layer->getName().c_str(), parentFlags, "%s", layer->getName().c_str())){
 							plLayerInterface * lay = plLayerInterface::Convert(layer->getObj());
@@ -103,7 +107,7 @@ void Renderer::draw(){
 	#define DEFAULT_WIDTH 160
 	
 	ImGui::SetNextWindowPos(ImVec2(0,0), ImGuiCond_FirstUseEver);
-	ImGui::SetNextWindowSize(ImVec2(270,250), ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowSize(ImVec2(270,270), ImGuiCond_FirstUseEver);
 	if (ImGui::Begin("Settings")) {
 		static int current_item_id = 0;
 		
@@ -132,6 +136,17 @@ void Renderer::draw(){
 		
 		ImGui::Checkbox("Wireframe", &_wireframe);
 		ImGui::SameLine();
+		if(ImGui::Checkbox("Vertex colors", &_vertexOnly)){
+			const auto prog = Resources::manager().getProgram("object_basic");
+			glUseProgram(prog->id());
+			glUniform1i(prog->uniform("forceVertexColor"), _vertexOnly);
+			glUseProgram(0);
+			const auto prog1 = Resources::manager().getProgram("object_special");
+			glUseProgram(prog1->id());
+			glUniform1i(prog1->uniform("forceVertexColor"), _vertexOnly);
+			glUseProgram(0);
+		}
+		
 		if(ImGui::Checkbox("Default light", &_forceLighting)){
 			const auto prog = Resources::manager().getProgram("object_basic");
 			glUseProgram(prog->id());
@@ -142,6 +157,18 @@ void Renderer::draw(){
 			glUniform1i(prog1->uniform("forceLighting"), _forceLighting);
 			glUseProgram(0);
 		}
+		ImGui::SameLine();
+		if(ImGui::Checkbox("No lights", &_forceNoLighting)){
+			const auto prog = Resources::manager().getProgram("object_basic");
+			glUseProgram(prog->id());
+			glUniform1i(prog->uniform("forceNoLighting"), _forceNoLighting);
+			glUseProgram(0);
+			const auto prog1 = Resources::manager().getProgram("object_special");
+			glUseProgram(prog1->id());
+			glUniform1i(prog1->uniform("forceNoLighting"), _forceNoLighting);
+			glUseProgram(0);
+		}
+		
 		
 		ImGui::Checkbox("Culling", &_doCulling); ImGui::SameLine();
 		ImGui::PushItemWidth(90.0f);

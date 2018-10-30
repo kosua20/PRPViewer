@@ -27,7 +27,7 @@ Object::Object(const Type & type, std::shared_ptr<ProgramInfos> prog, const glm:
 Object::~Object() {}
 
 
-void Object::addSubObject(const MeshInfos & infos, hsGMaterial * material, const unsigned int shadingMode){
+void Object::addSubObject(const MeshInfos & infos, hsGMaterial * material, const std::vector<Light> & lights, const unsigned int shadingMode){
 	if(_subObjects.empty()){
 		_localBounds = infos.bbox;
 	} else {
@@ -43,18 +43,18 @@ void Object::addSubObject(const MeshInfos & infos, hsGMaterial * material, const
 	if(!material->getLayers().empty()){
 		const auto & layKey = material->getLayers()[0];
 		// Obtain the layer to apply.
-		const plLayerInterface * lay = plLayerInterface::Convert(layKey->getObj(), false);
+		plLayerInterface * lay = plLayerInterface::Convert(layKey->getObj(), false);
 		isAlphaBlend = lay->getState().fBlendFlags & hsGMatState::kBlendAlpha;
 		_transparent = _transparent || isAlphaBlend;
 		// Also check the underlay.
-		const bool hasUnderlay = lay->getUnderLay().Exists();
-		if(hasUnderlay){
-			const plLayerInterface * lay1 = plLayerInterface::Convert(lay->getUnderLay()->getObj(), false);
-			isAlphaBlend = lay1->getState().fBlendFlags & hsGMatState::kBlendAlpha;
-			_transparent = _transparent || isAlphaBlend;
+		while(lay->getUnderLay().Exists()){
+			 plLayerInterface * lay1 = plLayerInterface::Convert(lay->getUnderLay()->getObj(), false);
+			const bool isAlphaBlend1 = lay1->getState().fBlendFlags & hsGMatState::kBlendAlpha;
+			_transparent = _transparent || isAlphaBlend1;
+			lay = lay1;
 		}
 	}
-	auto newSubObject = std::make_shared<SubObject>(infos, material, shadingMode, isAlphaBlend);
+	auto newSubObject = std::make_shared<SubObject>(infos, material, lights, shadingMode, isAlphaBlend);
 	
 	_subObjects.push_back(newSubObject);
 	
@@ -187,7 +187,10 @@ void Object::draw(const glm::mat4& view, const glm::mat4& projection, const int 
 		if(subObject->material->getLayers().size() == 1 && !hasTexture && !hasUnderlay){
 			continue;
 		}
-		   
+		// The light state is shared by all layers.
+		setupLights(_program, subObject->lights, view);
+		setupLights(Resources::manager().getProgram("object_special"), subObject->lights, view);
+		
 		// Transparent object: layer  has non unit opacity + blend.
 		for(size_t tid = 0; tid < subObject->material->getLayers().size(); tid++){
 			
@@ -267,8 +270,9 @@ void Object::draw(const glm::mat4& view, const glm::mat4& projection, const int 
 				
 						if(!(layNext->getState().fBlendFlags & hsGMatState::kBlendNoTexAlpha) &&
 						   layNext->getTexture().Exists() && !(layNext->getState().fMiscFlags & hsGMatState::kMiscNoShadowAlpha)){
-							// In this case, best to use the next layer.
+							
 							// TODO: make sure that we should'nt instead perform the blend in another way.
+							renderLayer(subObject, lay, tid);
 							++tid;
 							continue;
 						}
@@ -292,6 +296,34 @@ void Object::draw(const glm::mat4& view, const glm::mat4& projection, const int 
 	glEnable(GL_CULL_FACE);
 	checkGLError();
 	
+}
+
+
+void Object::setupLights(const std::shared_ptr<ProgramInfos> & program, const std::vector<Light> & lights, const glm::mat4 & view) const {
+	const bool empty = lights.empty();
+	glUseProgram(_program->id());
+	glUniform1i(_program->uniform("noLights"), empty);
+	if(empty){
+		return;
+	}
+	
+	const int lightCount = std::min(8, (int)lights.size());
+	for(int lid = 0; lid < lightCount; ++lid  ){
+		const auto & light = lights[lid];
+		//light.diffuse = glm::vec3(4.0f);
+		const std::string lightName = "lights[" + std::to_string(lid) + "]";
+		glUniform1i(_program->uniform(lightName + ".enabled"), 1);
+		const glm::vec4 viewLightDir = view * light.posdir;
+		glUniform4fv(_program->uniform(lightName + ".posdir"), 1, &viewLightDir[0]);
+		glUniform3fv(_program->uniform(lightName + ".ambient"), 1, &light.ambient[0]);
+		glUniform3fv(_program->uniform(lightName + ".diffuse"), 1, &light.diffuse[0]);
+		glUniform3fv(_program->uniform(lightName + ".specular"), 1, &light.specular[0]);
+		glUniform3f(_program->uniform(lightName + ".attenuations"), light.constAtten, light.linAtten, light.quadAtten);
+	}
+	for(int lid = lightCount; lid < 8; ++lid){
+		const std::string lightName = "lights[" + std::to_string(lid) + "]";
+		glUniform1f(_program->uniform(lightName + ".enabled"), 0);
+	}
 }
 
 void Object::resetState() const {

@@ -7,6 +7,21 @@
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 
+struct Light {
+	
+	enum Type {
+		DIR, OMNI, SPOT
+	} type;
+	
+	glm::vec4 posdir;
+	glm::vec3 ambient;
+	glm::vec3 diffuse;
+	glm::vec3 specular; //unused?
+	float constAtten;
+	float linAtten;
+	float quadAtten;
+	float scale;
+};
 
 class hsGMaterial;
 
@@ -26,12 +41,14 @@ public:
 		hsGMaterial * material;
 		unsigned int mode;
 		bool transparent;
+		std::vector<Light> lights;
 		
-		SubObject(MeshInfos amesh, hsGMaterial * amaterial, unsigned int amode, bool atransparent){
+		SubObject(MeshInfos amesh, hsGMaterial * amaterial, const std::vector<Light> & alights, unsigned int amode, bool atransparent){
 			mesh = amesh;
 			material = amaterial;
 			mode = amode;
 			transparent = atransparent;
+			lights = alights;
 		}
 	};
 	
@@ -39,7 +56,7 @@ public:
 
 	~Object();
 	
-	void addSubObject(const MeshInfos & infos, hsGMaterial * material, const unsigned int shadingMode);
+	void addSubObject(const MeshInfos & infos, hsGMaterial * material, const std::vector<Light> & lights, const unsigned int shadingMode);
 	
 	/// Draw function
 	void drawDebug(const glm::mat4& view, const glm::mat4& projection, const int subObject = -1) const;
@@ -74,6 +91,7 @@ private:
 	void renderLayer(const std::shared_ptr<SubObject> & subObject, plLayerInterface * lay, const int tid) const;
 	void renderLayerMult(const std::shared_ptr<SubObject> & subObject, plLayerInterface * lay0, plLayerInterface * lay1, const int tid) const;
 	
+	void setupLights(const std::shared_ptr<ProgramInfos> & program, const std::vector<Light> & lights, const glm::mat4 & view) const;
 	void resetState() const;
 	void depthState(plLayerInterface* lay, const bool forceDecal, const int tid) const;
 	void shadeState(const std::shared_ptr<ProgramInfos> & program, plLayerInterface* lay, unsigned int mode) const;

@@ -48,6 +48,20 @@ uniform sampler2D textures1;
 
 uniform bool forceLighting = false;
 
+uniform bool noLights;
+uniform bool forceNoLighting = false;
+
+struct Light {
+	vec4 posdir;
+	vec3 ambient;
+	vec3 diffuse;
+	vec3 specular;
+	vec3 attenuations;
+	bool enabled;
+};
+
+uniform Light lights[8];
+
 // Output: tangent space matrix, position in view space and uv.
 out INTERFACE {
 	vec4 color;
@@ -128,19 +142,20 @@ void main(){
 	vec4 LAmbient = vec4(0.0);
 	vec4 LDiffuse = vec4(0.0);
 		
-	/*TODO:
-	 for (size_t i = 0; i < 8; i++) {
-	 vec3 NDirection = normalize(vec3(worldToLocal*vec4(anor,1.0)));
-		LampStruct lamp = uLampSources;
-	 
-		vec3 v2l = vec3(lamp.position - mL2W*vec4(apos,1.0)*lamp.position.w);
-		float distance = length(v2l);
-		vec3 direction = normalize(v2l);
-		float attenuatuin = mix(1.0, 1.0/(lamp.constAtten+lamp.linAtten*distance + lamp.quadAtten * distance * distance), lamp.position.w);
-		LAmbient = LAmbient + attenuation*(lamp.ambient*lamp.scale);
-		LDiffuse = LDiffuse + MDiffuse*(lamp.diffuse*lamp.scale)*max(0.0, dot(Ndirection, direction)*attenuation);
-	 
-	}*/
+	if(!noLights && !forceNoLighting){
+		vec3 NDirection = normalize(Out.camNor.xyz);
+		for (int i = 0; i < 8; i++) {
+			if(!lights[i].enabled){
+				break;
+			}
+			vec3 v2l = vec3(lights[i].posdir - Out.camPos*lights[i].posdir.w);
+			float distance = length(v2l);
+			vec3 direction = normalize(v2l);
+			float attenuation = mix(1.0, 1.0/(lights[i].attenuations.x+lights[i].attenuations.y*distance + lights[i].attenuations.z * distance * distance), lights[i].posdir.w);
+			LAmbient.xyz = LAmbient.xyz + attenuation*(lights[i].ambient);
+			LDiffuse.xyz = LDiffuse.xyz + MDiffuse.xyz*(lights[i].diffuse)*max(0.0, dot(NDirection, direction)*attenuation);
+		}
+	}
 		
 	vec4 ambientFinal = forceLighting ? vec4(1.0) : clamp(MAmbient*(globalAmbient+LAmbient), 0.0, 1.0);
 	vec4 diffuseFinal = clamp(LDiffuse, 0.0, 1.0);
