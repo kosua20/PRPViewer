@@ -189,8 +189,8 @@ void Object::draw(const glm::mat4& view, const glm::mat4& projection, const int 
 		}
 		// The light state is shared by all layers.
 		setupLights(_program, subObject->lights, view);
-		setupLights(Resources::manager().getProgram("object_special"), subObject->lights, view);
 		
+		bool setupSecondProgram = false;
 		// Transparent object: layer  has non unit opacity + blend.
 		for(size_t tid = 0; tid < subObject->material->getLayers().size(); tid++){
 			
@@ -245,6 +245,11 @@ void Object::draw(const glm::mat4& view, const glm::mat4& projection, const int 
 						glUniformMatrix4fv(program->uniform("mvp"), 1, GL_FALSE, &MVP[0][0]);
 						glUniformMatrix4fv(program->uniform("invV"), 1, GL_FALSE, &invV[0][0]);
 						glUniformMatrix3fv(program->uniform("normalMatrix"), 1, GL_FALSE, &normalMatrix[0][0]);
+						
+						if(!setupSecondProgram){
+							setupLights(Resources::manager().getProgram("object_special"), subObject->lights, view);
+							setupSecondProgram = true;
+						}
 						renderLayerMult(subObject, lay, layNext, tid);
 						++tid;
 						continue;
@@ -301,8 +306,8 @@ void Object::draw(const glm::mat4& view, const glm::mat4& projection, const int 
 
 void Object::setupLights(const std::shared_ptr<ProgramInfos> & program, const std::vector<Light> & lights, const glm::mat4 & view) const {
 	const bool empty = lights.empty();
-	glUseProgram(_program->id());
-	glUniform1i(_program->uniform("noLights"), empty);
+	glUseProgram(program->id());
+	glUniform1i(program->uniform("noLights"), empty);
 	if(empty){
 		return;
 	}
@@ -312,18 +317,20 @@ void Object::setupLights(const std::shared_ptr<ProgramInfos> & program, const st
 		const auto & light = lights[lid];
 		//light.diffuse = glm::vec3(4.0f);
 		const std::string lightName = "lights[" + std::to_string(lid) + "]";
-		glUniform1i(_program->uniform(lightName + ".enabled"), 1);
+		glUniform1i(program->uniform(lightName + ".enabled"), 1);
 		const glm::vec4 viewLightDir = view * light.posdir;
-		glUniform4fv(_program->uniform(lightName + ".posdir"), 1, &viewLightDir[0]);
-		glUniform3fv(_program->uniform(lightName + ".ambient"), 1, &light.ambient[0]);
-		glUniform3fv(_program->uniform(lightName + ".diffuse"), 1, &light.diffuse[0]);
-		glUniform3fv(_program->uniform(lightName + ".specular"), 1, &light.specular[0]);
-		glUniform3f(_program->uniform(lightName + ".attenuations"), light.constAtten, light.linAtten, light.quadAtten);
+		glUniform4fv(program->uniform(lightName + ".posdir"), 1, &viewLightDir[0]);
+		glUniform3fv(program->uniform(lightName + ".ambient"), 1, &light.ambient[0]);
+		glUniform3fv(program->uniform(lightName + ".diffuse"), 1, &light.diffuse[0]);
+		glUniform3fv(program->uniform(lightName + ".specular"), 1, &light.specular[0]);
+		glUniform3f(program->uniform(lightName + ".attenuations"), light.constAtten, light.linAtten, light.quadAtten);
+		glUniform1f(program->uniform(lightName + ".scale"), 1.0f);
 	}
 	for(int lid = lightCount; lid < 8; ++lid){
 		const std::string lightName = "lights[" + std::to_string(lid) + "]";
-		glUniform1f(_program->uniform(lightName + ".enabled"), 0);
+		glUniform1f(program->uniform(lightName + ".enabled"), 0);
 	}
+	checkGLError();
 }
 
 void Object::resetState() const {

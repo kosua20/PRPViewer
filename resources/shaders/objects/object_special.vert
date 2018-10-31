@@ -57,6 +57,7 @@ struct Light {
 	vec3 diffuse;
 	vec3 specular;
 	vec3 attenuations;
+	float scale;
 	bool enabled;
 };
 
@@ -152,8 +153,8 @@ void main(){
 			float distance = length(v2l);
 			vec3 direction = normalize(v2l);
 			float attenuation = mix(1.0, 1.0/(lights[i].attenuations.x+lights[i].attenuations.y*distance + lights[i].attenuations.z * distance * distance), lights[i].posdir.w);
-			LAmbient.xyz = LAmbient.xyz + attenuation*(lights[i].ambient);
-			LDiffuse.xyz = LDiffuse.xyz + MDiffuse.xyz*(lights[i].diffuse)*max(0.0, dot(NDirection, direction)*attenuation);
+			LAmbient.xyz = LAmbient.xyz + attenuation*(lights[i].ambient*lights[i].scale);
+			LDiffuse.xyz = LDiffuse.xyz + MDiffuse.xyz*(lights[i].diffuse*lights[i].scale)*max(0.0, dot(NDirection, direction)*attenuation);
 		}
 	}
 		

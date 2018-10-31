@@ -20,6 +20,7 @@
 #include <PRP/Light/plDirectionalLightInfo.h>
 #include <PRP/Light/plOmniLightInfo.h>
 #include <PRP/Light/plLightInfo.h>
+#include <PRP/Region/plSoftVolume.h>
 
 #include <Stream/plEncryptedStream.h>
 #include <Debug/plDebug.h>
@@ -29,6 +30,8 @@
 #include <cstring>
 #include <time.h>
 #include <fstream>
+
+
 
 unsigned int  kLiteMask = (plSpan::kLiteMaterial | plSpan::kLiteVtxPreshaded | plSpan::kLiteVtxNonPreshaded | plSpan::kLiteProjection | plSpan::kLiteShadowErase | plSpan::kLiteShadow);
 
@@ -292,6 +295,11 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 						Light newLight;
 						
 						newLight.scale = 1.0f;
+						if(light->getSoftVolume().Exists()){
+							plSoftVolume * softVol = plSoftVolume::Convert(light->getSoftVolume()->getObj());
+							newLight.scale = softVol->getInsideStrength();
+						}
+						
 						
 						const auto & lAmbi = light->getAmbient();
 						const auto & lDiff = light->getDiffuse();
