@@ -93,16 +93,73 @@ Age::~Age(){
 	
 }
 
-
+void processLight(const plLightInfo * light, Light & newLight){
+	plDirectionalLightInfo * lightDir = plDirectionalLightInfo::Convert(light->getKey()->getObj(), false);
+	plSpotLightInfo * lightSpot = plSpotLightInfo::Convert(light->getKey()->getObj(), false);
+	plOmniLightInfo * lightOmni = plOmniLightInfo::Convert(light->getKey()->getObj(), false);
+	
+	const auto & lightToWorld = light->getLightToWorld();
+	
+	// Might have to rotate here.
+	const glm::vec3 lightDirection = -glm::vec3(lightToWorld(0,2), lightToWorld(1,2), lightToWorld(2,2));
+	const glm::vec3 lightPosition = glm::vec3(lightToWorld(0,3), lightToWorld(1,3), lightToWorld(2,3));
+	
+	
+	newLight.scale = 1.0f;
+	if(light->getSoftVolume().Exists()){
+		plSoftVolume * softVol = plSoftVolume::Convert(light->getSoftVolume()->getObj());
+		newLight.scale = softVol->getInsideStrength();
+	}
+	
+	
+	const auto & lAmbi = light->getAmbient();
+	const auto & lDiff = light->getDiffuse();
+	const auto & lSpec = light->getSpecular();
+	newLight.ambient = glm::vec3(lAmbi.r, lAmbi.g, lAmbi.b);
+	newLight.diffuse = glm::vec3(lDiff.r, lDiff.g, lDiff.b);
+	newLight.specular = glm::vec3(lSpec.r, lSpec.g, lSpec.b);
+	
+	if(lightDir != NULL){
+		newLight.constAtten = 1.0f;
+		newLight.linAtten = 0.0f;
+		newLight.quadAtten = 0.0f;
+		newLight.posdir = glm::vec4(lightDirection, 0.0f);
+		//Log::Info()  << " directional, " << std::flush;
+		newLight.type = Light::DIR;
+	} else if(lightSpot != NULL){
+		newLight.constAtten = lightSpot->getAttenConst();
+		newLight.linAtten = lightSpot->getAttenLinear();
+		newLight.quadAtten = lightSpot->getAttenQuadratic();
+		// TODO: fallof and cutoff.
+		//Log::Info()  << " spotlight, " << std::flush;
+		newLight.posdir = glm::vec4(lightPosition, 1.0f);
+		newLight.type = Light::SPOT;
+	} else if(lightOmni != NULL){
+		newLight.constAtten = lightOmni->getAttenConst();
+		newLight.linAtten = lightOmni->getAttenLinear();
+		newLight.quadAtten = lightOmni->getAttenQuadratic();
+		newLight.posdir = glm::vec4(lightPosition, 1.0f);
+		newLight.type = Light::OMNI;
+		//Log::Info()  << " omni, " << std::flush;
+	}
+}
 
 void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 	plSceneNode* scene = rm.getSceneNode(ploc);
+	
+	std::map<std::string, Light> globalLights;
+	std::map<std::string, bool> globalLightsUsed;
 	
 	if(scene){
 		Log::Mute();
 		
 		for(const auto & objKey : scene->getSceneObjects()){
 			plSceneObject* obj = plSceneObject::Convert(rm.getObject(objKey));
+			
+			// Skip geometry for now.
+			if(obj->getDrawInterface().Exists()){
+				continue;
+			}
 			
 			// Find the linking points.
 			if(objKey->getName().substr(0, 11) == "LinkInPoint" && obj->getCoordInterface().Exists()){
@@ -116,13 +173,36 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 					_linkingPoints[_linkingNamesCache.back()] = glm::vec3(matCenter(0,3), matCenter(2,3)+ 5.0f, -matCenter(1,3));
 				}
 			}
+			
+			Log::Unmute();
+			
+			
+			
+			if(!obj->getInterfaces().empty()){
+				for(const auto & interf : obj->getInterfaces()){
+					plLightInfo *light = plLightInfo::Convert(interf->getObj(), false);
+					if(light != NULL){
+						Light newLight;
+						processLight(light, newLight);
+						const std::string lightName = interf->getName().to_std_string();
+						globalLights[lightName] = newLight;
+						globalLightsUsed[lightName] = false;
+					}
+					
+				}
+			}
+			
+			Log::Mute();
+		}
 		
+		// Now look for geometry.
+		for(const auto & objKey : scene->getSceneObjects()){
+			plSceneObject* obj = plSceneObject::Convert(rm.getObject(objKey));
 			if(!obj->getDrawInterface().Exists()){
 				continue;
 			}
-			Log::Unmute();
 			//Log::Info() << objKey->getName() << ", " << std::flush;
-			Log::Mute();
+			
 			plDrawInterface* draw = plDrawInterface::Convert(obj->getDrawInterface()->getObj());
 			
 			Object::Type type = Object::Default;
@@ -269,69 +349,17 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 					}
 					
 					
-					
-					
-					
-					
 					// Lights
 					Log::Unmute();
 					const auto & permalights = ice->getPermaLights();
 					std::vector<Light> lights;
 					for(const auto & lightKey : permalights){
-						
-						
-						
 						plLightInfo *light = plLightInfo::Convert(lightKey->getObj());
-						plDirectionalLightInfo * lightDir = plDirectionalLightInfo::Convert(lightKey->getObj(), false);
-						plSpotLightInfo * lightSpot = plSpotLightInfo::Convert(lightKey->getObj(), false);
-						plOmniLightInfo * lightOmni = plOmniLightInfo::Convert(lightKey->getObj(), false);
-						//Log::Info() << lightKey->getName() << ": ";
-						
-						const auto & lightToWorld = light->getLightToWorld();
-						
-						// Might have to rotate here.
-						const glm::vec3 lightDirection = -glm::vec3(lightToWorld(0,2), lightToWorld(1,2), lightToWorld(2,2));
-						const glm::vec3 lightPosition = glm::vec3(lightToWorld(0,3), lightToWorld(1,3), lightToWorld(2,3));
 						Light newLight;
-						
-						newLight.scale = 1.0f;
-						if(light->getSoftVolume().Exists()){
-							plSoftVolume * softVol = plSoftVolume::Convert(light->getSoftVolume()->getObj());
-							newLight.scale = softVol->getInsideStrength();
-						}
-						
-						
-						const auto & lAmbi = light->getAmbient();
-						const auto & lDiff = light->getDiffuse();
-						const auto & lSpec = light->getSpecular();
-						newLight.ambient = glm::vec3(lAmbi.r, lAmbi.g, lAmbi.b);
-						newLight.diffuse = glm::vec3(lDiff.r, lDiff.g, lDiff.b);
-						newLight.specular = glm::vec3(lSpec.r, lSpec.g, lSpec.b);
-						
-						if(lightDir != NULL){
-							newLight.constAtten = 1.0f;
-							newLight.linAtten = 0.0f;
-							newLight.quadAtten = 0.0f;
-							newLight.posdir = glm::vec4(lightDirection, 0.0f);
-							//Log::Info()  << " directional, " << std::flush;
-							newLight.type = Light::DIR;
-						} else if(lightSpot != NULL){
-							newLight.constAtten = lightSpot->getAttenConst();
-							newLight.linAtten = lightSpot->getAttenLinear();
-							newLight.quadAtten = lightSpot->getAttenQuadratic();
-							// TODO: fallof and cutoff.
-							//Log::Info()  << " spotlight, " << std::flush;
-							newLight.posdir = glm::vec4(lightPosition, 1.0f);
-							newLight.type = Light::SPOT;
-						} else if(lightOmni != NULL){
-							newLight.constAtten = lightOmni->getAttenConst();
-							newLight.linAtten = lightOmni->getAttenLinear();
-							newLight.quadAtten = lightOmni->getAttenQuadratic();
-							newLight.posdir = glm::vec4(lightPosition, 1.0f);
-							newLight.type = Light::OMNI;
-							//Log::Info()  << " omni, " << std::flush;
-						}
+						processLight(light, newLight);
 						lights.push_back(newLight);
+						const std::string lightName = lightKey->getName().to_std_string();
+						globalLightsUsed[lightName] = true;
 					}
 					
 					
@@ -351,7 +379,23 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 		Log::Unmute();
 	}
 	
+	
+	//Log::Unmute();
 	Log::Mute();
+	int lightsCount = 0;
+	for(const auto & globLight : globalLightsUsed){
+		if(globLight.second){
+			continue;
+		}
+		Log::Info() << "Global light: " << globLight.first << std::endl;
+		++lightsCount;
+	}
+	if(lightsCount != 0){
+		Log::Info() << lightsCount << " / " << globalLightsUsed.size() << " lights are not used." << std::endl;
+	}
+	
+	
+	
 	
 	// Extract textures.
 	const auto textureKeys = rm.getKeys(ploc, pdUnifiedTypeMap::ClassIndex("plMipmap"));
