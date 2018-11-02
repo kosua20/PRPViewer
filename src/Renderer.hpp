@@ -61,6 +61,8 @@ private:
 	float _cameraFOV;
 	float _clearColor[3];
 	bool _vertexOnly;
+	bool _showDot;
+	
 	enum DisplayMode {
 		Scene = 0, OneObject = 1, OneTexture = 2
 	};

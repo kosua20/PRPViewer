@@ -53,6 +53,7 @@ Renderer::Renderer(Config & config) : _config(config) {
 	_vertexOnly = false;
 	_forceNoLighting = false;
 	_forceLighting = false;
+	_showDot = true;
 }
 
 
@@ -60,7 +61,7 @@ Renderer::Renderer(Config & config) : _config(config) {
 void Renderer::draw(){
 	
 	// Infos window.
-	ImGui::SetNextWindowPos(ImVec2(0,270), ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowPos(ImVec2(0,290), ImGuiCond_FirstUseEver);
 	ImGui::SetNextWindowSize(ImVec2(270,410), ImGuiCond_FirstUseEver);
 	if (ImGui::Begin("Infos")) {
 		ImGui::Text("%2.1f FPS (%2.1f ms)", ImGui::GetIO().Framerate, ImGui::GetIO().DeltaTime*1000.0f);
@@ -107,7 +108,7 @@ void Renderer::draw(){
 	#define DEFAULT_WIDTH 160
 	
 	ImGui::SetNextWindowPos(ImVec2(0,0), ImGuiCond_FirstUseEver);
-	ImGui::SetNextWindowSize(ImVec2(270,270), ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowSize(ImVec2(270,290), ImGuiCond_FirstUseEver);
 	if (ImGui::Begin("Settings")) {
 		static int current_item_id = 0;
 		
@@ -189,6 +190,7 @@ void Renderer::draw(){
 		}
 		ImGui::PopItemWidth();
 		ImGui::ColorEdit3("Background", &_clearColor[0]);
+		ImGui::Checkbox("Show cam. center", &_showDot);
 	}
 	ImGui::End();
 	
@@ -453,21 +455,22 @@ void Renderer::draw(){
 
 	
 	// Render the camera cursor.
-	const float scale = glm::length(_camera.getDirection());
-	const glm::mat4 MVP = _camera.projection() * _camera.view() * glm::scale(glm::translate(glm::mat4(1.0f), _camera.getCenter()), glm::vec3(0.015f*scale));
-	const auto debugProgram = Resources::manager().getProgram("camera-center");
-	const auto debugObject = Resources::manager().getMesh("sphere");
-	
 	glDisable(GL_BLEND);
-	glEnable(GL_DEPTH_TEST);
-	glDisable(GL_CULL_FACE);
-	glUseProgram(debugProgram->id());
-	glBindVertexArray(debugObject.vId);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, debugObject.eId);
-	glUniformMatrix4fv(debugProgram->uniform("mvp"), 1, GL_FALSE, &MVP[0][0]);
-	glUniform2f(debugProgram->uniform("screenSize"), _config.screenResolution[0], _config.screenResolution[1]);
-	glDrawElements(GL_TRIANGLES, debugObject.count, GL_UNSIGNED_INT, (void*)0);
-	
+	if(_showDot){
+		glEnable(GL_DEPTH_TEST);
+		glDisable(GL_CULL_FACE);
+		const float scale = glm::length(_camera.getDirection());
+		const glm::mat4 MVP = _camera.projection() * _camera.view() * glm::scale(glm::translate(glm::mat4(1.0f), _camera.getCenter()), glm::vec3(0.015f*scale));
+		const auto debugProgram = Resources::manager().getProgram("camera-center");
+		const auto debugObject = Resources::manager().getMesh("sphere");
+		
+		glUseProgram(debugProgram->id());
+		glBindVertexArray(debugObject.vId);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, debugObject.eId);
+		glUniformMatrix4fv(debugProgram->uniform("mvp"), 1, GL_FALSE, &MVP[0][0]);
+		glUniform2f(debugProgram->uniform("screenSize"), _config.screenResolution[0], _config.screenResolution[1]);
+		glDrawElements(GL_TRIANGLES, debugObject.count, GL_UNSIGNED_INT, (void*)0);
+	}
 	// Reset state.
 	glBindVertexArray(0);
 	glUseProgram(0);
