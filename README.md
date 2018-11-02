@@ -5,8 +5,9 @@ This is a realtime viewer for Uru and Myst V game assets. It relies on the open-
 More information in this series of blog posts:
 
 * [Coming back to Uru, part 1](http://blog.simonrodriguez.fr/articles/10-04-2018_coming_back_to_uru.html)  
-* [Coming back to Uru, part 1](http://blog.simonrodriguez.fr/articles/22-04-2018_coming_back_to_uru_part_2.html)  
-* [Coming back to Uru, part 1](http://blog.simonrodriguez.fr/articles/25-10-2018_coming_back_to_uru_part_3.html )  
+* [Coming back to Uru, part 2](http://blog.simonrodriguez.fr/articles/22-04-2018_coming_back_to_uru_part_2.html)  
+* [Coming back to Uru, part 3](http://blog.simonrodriguez.fr/articles/25-10-2018_coming_back_to_uru_part_3.html )  
+* [Coming back to Uru, part 4](http://blog.simonrodriguez.fr/articles/02-11-2018_coming_back_to_uru_part_4.html)
 
 ![Result 1](images/result0.jpg)
 ![Result 2](images/result1.jpg)
