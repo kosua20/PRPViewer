@@ -8,6 +8,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <stdio.h>
 #include <vector>
+#include <cctype>
 
 bool findSubstringInsensitive(const std::string & strHaystack, const std::string & strNeedle)
 {

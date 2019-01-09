@@ -1,5 +1,7 @@
 #ifndef GLUtilities_h
 #define GLUtilities_h
+#define NOMINMAX
+
 #include "../resources/MeshUtilities.hpp"
 #include "../Framebuffer.hpp"
 #include <PRP/Surface/plMipmap.h>

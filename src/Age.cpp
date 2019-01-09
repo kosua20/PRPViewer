@@ -24,8 +24,9 @@
 #include <string_theory/stdio>
 #include <cstring>
 #include <time.h>
-#include <unistd.h>
 #include <fstream>
+
+#define M_PI_2 1.57079632679489661923
 
 unsigned int  kLiteMask = (plSpan::kLiteMaterial | plSpan::kLiteVtxPreshaded | plSpan::kLiteVtxNonPreshaded | plSpan::kLiteProjection | plSpan::kLiteShadowErase | plSpan::kLiteShadow);
 
