@@ -24,6 +24,10 @@ uniform bool blendNoTexAlpha;
 //uniform bool blendAlphaMult;
 
 uniform float alphaThreshold;
+uniform bool forceVertexColor = false;
+
+
+
 
 
 out vec4 fragColor;
@@ -32,7 +36,7 @@ void main(){
 	vec3 fCurrColor = vec3(0.0);
 	float fCurrAlpha = 0.0;
 	
-	if (useTexture==0) {
+	if (useTexture==0 || forceVertexColor) {
 		// passthrough.
 		// discard;
 		fCurrColor = In.color.rgb;

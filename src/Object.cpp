@@ -27,7 +27,7 @@ Object::Object(const Type & type, std::shared_ptr<ProgramInfos> prog, const glm:
 Object::~Object() {}
 
 
-void Object::addSubObject(const MeshInfos & infos, hsGMaterial * material, const unsigned int shadingMode){
+void Object::addSubObject(const MeshInfos & infos, hsGMaterial * material, const std::vector<Light> & lights, const unsigned int shadingMode){
 	if(_subObjects.empty()){
 		_localBounds = infos.bbox;
 	} else {
@@ -42,12 +42,19 @@ void Object::addSubObject(const MeshInfos & infos, hsGMaterial * material, const
 	bool isAlphaBlend = false;
 	if(!material->getLayers().empty()){
 		const auto & layKey = material->getLayers()[0];
-		// Obtain the layer to aply.
-		const plLayerInterface * lay = plLayerInterface::Convert(layKey->getObj(), false);
+		// Obtain the layer to apply.
+		plLayerInterface * lay = plLayerInterface::Convert(layKey->getObj(), false);
 		isAlphaBlend = lay->getState().fBlendFlags & hsGMatState::kBlendAlpha;
 		_transparent = _transparent || isAlphaBlend;
+		// Also check the underlay.
+		while(lay->getUnderLay().Exists()){
+			 plLayerInterface * lay1 = plLayerInterface::Convert(lay->getUnderLay()->getObj(), false);
+			const bool isAlphaBlend1 = lay1->getState().fBlendFlags & hsGMatState::kBlendAlpha;
+			_transparent = _transparent || isAlphaBlend1;
+			lay = lay1;
+		}
 	}
-	auto newSubObject = std::make_shared<SubObject>(infos, material, shadingMode, isAlphaBlend);
+	auto newSubObject = std::make_shared<SubObject>(infos, material, lights, shadingMode, isAlphaBlend);
 	
 	_subObjects.push_back(newSubObject);
 	
@@ -62,8 +69,8 @@ void Object::addSubObject(const MeshInfos & infos, hsGMaterial * material, const
 	//// Soid is the first transparent element, or the size.
 	//_subObjects.insert(_subObjects.begin()+soid, newSubObject);
 	//}
-	
 }
+
 
 const bool Object::isVisible(const glm::vec3 & point, const glm::mat4 & viewproj) const {
 	return _globalBounds.contains(point) || _globalBounds.intersectsFrustum(viewproj);
@@ -180,7 +187,10 @@ void Object::draw(const glm::mat4& view, const glm::mat4& projection, const int 
 		if(subObject->material->getLayers().size() == 1 && !hasTexture && !hasUnderlay){
 			continue;
 		}
-		   
+		// The light state is shared by all layers.
+		setupLights(_program, subObject->lights, view);
+		
+		bool setupSecondProgram = false;
 		// Transparent object: layer  has non unit opacity + blend.
 		for(size_t tid = 0; tid < subObject->material->getLayers().size(); tid++){
 			
@@ -197,22 +207,32 @@ void Object::draw(const glm::mat4& view, const glm::mat4& projection, const int 
 				continue;
 			}
 			// Fix for non texture null state layers.
-			if(!lay->getTexture().Exists() && lay->getState().fMiscFlags == 0 && lay->getState().fBlendFlags == 0 && lay->getState().fZFlags == 0 && lay->getState().fShadeFlags == 0){
+			bool shouldStop = false;
+			while(!lay->getTexture().Exists() && lay->getState().fMiscFlags == 0 && lay->getState().fBlendFlags == 0 && lay->getState().fZFlags == 0 && lay->getState().fShadeFlags == 0 && !shouldStop){
 				
 				if(lay->getUnderLay().Exists()){
-					//Log::Info() << "Underlay: " << lay->getUnderLay()->getName() << std::endl;
+					// So we have a texture, but no infos on how to render it, and then an underlay?
+					// Smells like the vertex color hack.
+					// Where the underlay is used as an alpha map.
 					plLayerInterface * underlay = plLayerInterface::Convert(lay->getUnderLay()->getObj(), false);
-					renderLayer(subObject, underlay, tid);
-					//++tid;
+					lay = underlay;
+					// Just to be safe, let's replicate the same check here.
+					if((lay->getState().fMiscFlags & (hsGMatState::kMiscBumpDu | hsGMatState::kMiscBumpDv | hsGMatState::kMiscBumpDw | hsGMatState::kMiscBumpLayer | hsGMatState::kMiscBumpChans)) != 0){
+						shouldStop = true;
+					}
+				} else {
+					shouldStop = true;
 				}
+				
+			}
+			if(shouldStop){
 				continue;
 			}
 			
 			// TODO: cache this at load time?
 			if(tid < subObject->material->getLayers().size()-1){
 				
-				const bool restartBindNext = (lay->getState().fMiscFlags & hsGMatState::kMiscBindNext) ;
-				//&& (lay->getState().fMiscFlags & hsGMatState::kMiscRestartPassHere)
+				const bool restartBindNext = (lay->getState().fMiscFlags & hsGMatState::kMiscBindNext) && (lay->getState().fMiscFlags & hsGMatState::kMiscRestartPassHere);
 				if(restartBindNext){
 					plLayerInterface * layNext = plLayerInterface::Convert(subObject->material->getLayers()[tid+1]->getObj(), false);
 					const bool nextIsAlphaBlend = (layNext->getState().fBlendFlags & hsGMatState::kBlendAlphaMult) && (layNext->getState().fBlendFlags & hsGMatState::kBlendNoTexColor);
@@ -225,11 +245,43 @@ void Object::draw(const glm::mat4& view, const glm::mat4& projection, const int 
 						glUniformMatrix4fv(program->uniform("mvp"), 1, GL_FALSE, &MVP[0][0]);
 						glUniformMatrix4fv(program->uniform("invV"), 1, GL_FALSE, &invV[0][0]);
 						glUniformMatrix3fv(program->uniform("normalMatrix"), 1, GL_FALSE, &normalMatrix[0][0]);
+						
+						if(!setupSecondProgram){
+							setupLights(Resources::manager().getProgram("object_special"), subObject->lights, view);
+							setupSecondProgram = true;
+						}
 						renderLayerMult(subObject, lay, layNext, tid);
 						++tid;
 						continue;
 					} else {
 						//Log::Warning() << "Can this case arise?" << std::endl;
+					}
+				} else if(lay->getState().fMiscFlags & hsGMatState::kMiscBindNext){
+					plLayerInterface * layNext = plLayerInterface::Convert(subObject->material->getLayers()[tid+1]->getObj(), false);
+					
+					// If the next one is a kMiscNoShadowAlpha, don't use it as an alpha.
+					// Just render the current layer as usual, and skip the next one even.
+					if(layNext->getState().fMiscFlags & hsGMatState::kMiscNoShadowAlpha){
+						renderLayer(subObject, lay, tid);
+						++tid;
+						continue;
+					}
+					// If we are alpha.
+					if((lay->getState().fBlendFlags & hsGMatState::kBlendMask) == hsGMatState::kBlendAlpha){
+						
+						// If the following conditions are met, it means that layer 1 is a better choice to
+						// get the transparency from. The specific case we're looking for is vertex alpha
+						// simulated by an invisible second layer alpha LUT (known as the alpha hack).
+				
+						if(!(layNext->getState().fBlendFlags & hsGMatState::kBlendNoTexAlpha) &&
+						   layNext->getTexture().Exists() && !(layNext->getState().fMiscFlags & hsGMatState::kMiscNoShadowAlpha)){
+							
+							// TODO: make sure that we should'nt instead perform the blend in another way.
+							renderLayer(subObject, lay, tid);
+							++tid;
+							continue;
+						}
+						
 					}
 				}
 			}
@@ -249,6 +301,36 @@ void Object::draw(const glm::mat4& view, const glm::mat4& projection, const int 
 	glEnable(GL_CULL_FACE);
 	checkGLError();
 	
+}
+
+
+void Object::setupLights(const std::shared_ptr<ProgramInfos> & program, const std::vector<Light> & lights, const glm::mat4 & view) const {
+	const bool empty = lights.empty();
+	glUseProgram(program->id());
+	glUniform1i(program->uniform("noLights"), empty);
+	if(empty){
+		return;
+	}
+	
+	const int lightCount = std::min(8, (int)lights.size());
+	for(int lid = 0; lid < lightCount; ++lid  ){
+		const auto & light = lights[lid];
+		//light.diffuse = glm::vec3(4.0f);
+		const std::string lightName = "lights[" + std::to_string(lid) + "]";
+		glUniform1i(program->uniform(lightName + ".enabled"), 1);
+		const glm::vec4 viewLightDir = view * light.posdir;
+		glUniform4fv(program->uniform(lightName + ".posdir"), 1, &viewLightDir[0]);
+		glUniform3fv(program->uniform(lightName + ".ambient"), 1, &light.ambient[0]);
+		glUniform3fv(program->uniform(lightName + ".diffuse"), 1, &light.diffuse[0]);
+		glUniform3fv(program->uniform(lightName + ".specular"), 1, &light.specular[0]);
+		glUniform3f(program->uniform(lightName + ".attenuations"), light.constAtten, light.linAtten, light.quadAtten);
+		glUniform1f(program->uniform(lightName + ".scale"), 1.0f);
+	}
+	for(int lid = lightCount; lid < 8; ++lid){
+		const std::string lightName = "lights[" + std::to_string(lid) + "]";
+		glUniform1f(program->uniform(lightName + ".enabled"), 0);
+	}
+	checkGLError();
 }
 
 void Object::resetState() const {
@@ -596,7 +678,7 @@ void Object::renderLayerMult(const std::shared_ptr<SubObject> & subObject, plLay
 
 
 void Object::clean() const {
-	
+	// Deleted in the Resources manager.
 }
 
 

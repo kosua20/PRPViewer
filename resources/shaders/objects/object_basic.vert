@@ -42,6 +42,7 @@ uniform int useTexture;
 uniform bvec2 clampedTexture;
 
 uniform bool forceLighting = false;
+uniform bool forceNoLighting = false;
 
 // Output: tangent space matrix, position in view space and uv.
 out INTERFACE {
@@ -51,6 +52,20 @@ out INTERFACE {
 	vec3 uv;
 } Out ;
 
+
+uniform bool noLights;
+
+struct Light {
+	vec4 posdir;
+	vec3 ambient;
+	vec3 diffuse;
+	vec3 specular;
+	vec3 attenuations;
+	float scale;
+	bool enabled;
+};
+
+uniform Light lights[8];
 
 void main(){
 	
@@ -71,28 +86,23 @@ void main(){
 		
 	vec4 LAmbient = vec4(0.0);
 	vec4 LDiffuse = vec4(0.0);
-		
-	/*TODO:
-	 for (size_t i = 0; i < 8; i++) {
-	 vec3 NDirection = normalize(vec3(worldToLocal*vec4(anor,1.0)));
-		LampStruct lamp = uLampSources;
-	 
-		vec3 v2l = vec3(lamp.position - mL2W*vec4(apos,1.0)*lamp.position.w);
-		float distance = length(v2l);
-		vec3 direction = normalize(v2l);
-		float attenuatuin = mix(1.0, 1.0/(lamp.constAtten+lamp.linAtten*distance + lamp.quadAtten * distance * distance), lamp.position.w);
-		LAmbient = LAmbient + attenuation*(lamp.ambient*lamp.scale);
-		LDiffuse = LDiffuse + MDiffuse*(lamp.diffuse*lamp.scale)*max(0.0, dot(Ndirection, direction)*attenuation);
-	 
-	}*/
 	
-	vec3 NDirection = normalize(Out.camNor.xyz);
-	vec3 v2l = vec3(1.0,1.0,1.0);
-	vec3 direction = normalize(v2l);
-	
-	//LAmbient = LAmbient + 0.1;
-	//LDiffuse = LDiffuse + MDiffuse*max(0.0, dot(NDirection, direction));
-	
+	if(!noLights && !forceNoLighting){
+		vec3 NDirection = normalize(Out.camNor.xyz);
+		for (int i = 0; i < 8; i++) {
+			if(!lights[i].enabled){
+				break;
+			}
+			vec3 v2l = vec3(lights[i].posdir - Out.camPos*lights[i].posdir.w);
+			float distance = length(v2l);
+			vec3 direction = normalize(v2l);
+			float attenuation = mix(1.0, 1.0/(lights[i].attenuations.x+lights[i].attenuations.y*distance + lights[i].attenuations.z * distance * distance), lights[i].posdir.w);
+			LAmbient.xyz = LAmbient.xyz + attenuation*(lights[i].ambient*lights[i].scale);
+			LDiffuse.xyz = LDiffuse.xyz + MDiffuse.xyz*(lights[i].diffuse*lights[i].scale)*max(0.0, dot(NDirection, direction)*attenuation);
+		 	
+		}
+
+	}
 	
 		
 	vec4 ambientFinal = forceLighting ? vec4(1.0) : clamp(MAmbient*(globalAmbient+LAmbient), 0.0, 1.0);
@@ -103,7 +113,7 @@ void main(){
 		
 	Out.color = vec4(material.rgb, baseAlpha);
 		
-		
+
 	// Compute UV coordinates.
 	if(useTexture>0){
 		mat4 matrix;
@@ -152,8 +162,8 @@ void main(){
 				break;
 		}
 			
-		coords.x = clampedTexture.x ? clamp(coords.x, 0.01, 0.99) : coords.x;
-		coords.y = clampedTexture.y ? clamp(coords.y, 0.01, 0.99) : coords.y;
+		coords.x = clampedTexture.x ? clamp(coords.x, 0.0, 0.99) : coords.x;
+		coords.y = clampedTexture.y ? clamp(coords.y, 0.0, 0.99) : coords.y;
 		
 			
 		Out.uv = coords.xyz;

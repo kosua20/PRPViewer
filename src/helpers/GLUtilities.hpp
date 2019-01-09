@@ -1,6 +1,8 @@
 #ifndef GLUtilities_h
 #define GLUtilities_h
+
 #define NOMINMAX
+
 
 #include "../resources/MeshUtilities.hpp"
 #include "../Framebuffer.hpp"
@@ -10,6 +12,7 @@
 #include <string>
 #include <vector>
 #include <memory>
+
 
 /// This macro is used to check for OpenGL errors with access to the file and line number where the error is detected.
 

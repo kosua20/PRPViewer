@@ -55,9 +55,13 @@ private:
 	bool _doCulling = true;
 	float _cullingDistance = 1500.0f;
 	int _drawCount = 0;
-	bool _forceLighting = false;
+	bool _forceLighting;
+	bool _forceNoLighting;
 	float _cameraFarPlane;
 	float _cameraFOV;
+	float _clearColor[3];
+	bool _vertexOnly;
+	bool _showDot;
 	
 	enum DisplayMode {
 		Scene = 0, OneObject = 1, OneTexture = 2

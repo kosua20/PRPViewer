@@ -49,6 +49,11 @@ Renderer::Renderer(Config & config) : _config(config) {
 	_age = std::make_shared<Age>();
 	_resolutionScaling = 100.0f;
 	//loadAge("../../../data/uru/spyroom.age");
+	_clearColor[0] = _clearColor[1] = _clearColor[2] = 0.5f;
+	_vertexOnly = false;
+	_forceNoLighting = false;
+	_forceLighting = false;
+	_showDot = true;
 }
 
 
@@ -56,8 +61,8 @@ Renderer::Renderer(Config & config) : _config(config) {
 void Renderer::draw(){
 	
 	// Infos window.
-	ImGui::SetNextWindowPos(ImVec2(0,220), ImGuiCond_FirstUseEver);
-	ImGui::SetNextWindowSize(ImVec2(270,460), ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowPos(ImVec2(0,290), ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowSize(ImVec2(270,410), ImGuiCond_FirstUseEver);
 	if (ImGui::Begin("Infos")) {
 		ImGui::Text("%2.1f FPS (%2.1f ms)", ImGui::GetIO().Framerate, ImGui::GetIO().DeltaTime*1000.0f);
 		ImGui::Text("Age: %s", (_age->getName().c_str()));
@@ -74,7 +79,8 @@ void Renderer::draw(){
 			
 			for(int soid = 0; soid < selectedObj->subObjects().size(); ++soid){
 				const auto & subobj = selectedObj->subObjects()[soid];
-				if(ImGui::TreeNodeEx((void*)(intptr_t)soid, parentFlags, "Subobject %i", soid)){
+				const std::string subObjName = "Subobject " + std::to_string(soid);
+				if(ImGui::TreeNodeEx(subObjName.c_str(), parentFlags, "%s", subObjName.c_str())){
 					for(const auto & layer : subobj->material->getLayers()){
 						if(ImGui::TreeNodeEx(layer->getName().c_str(), parentFlags, "%s", layer->getName().c_str())){
 							plLayerInterface * lay = plLayerInterface::Convert(layer->getObj());
@@ -102,7 +108,7 @@ void Renderer::draw(){
 	#define DEFAULT_WIDTH 160
 	
 	ImGui::SetNextWindowPos(ImVec2(0,0), ImGuiCond_FirstUseEver);
-	ImGui::SetNextWindowSize(ImVec2(270,220), ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowSize(ImVec2(270,290), ImGuiCond_FirstUseEver);
 	if (ImGui::Begin("Settings")) {
 		static int current_item_id = 0;
 		
@@ -131,6 +137,17 @@ void Renderer::draw(){
 		
 		ImGui::Checkbox("Wireframe", &_wireframe);
 		ImGui::SameLine();
+		if(ImGui::Checkbox("Vertex colors", &_vertexOnly)){
+			const auto prog = Resources::manager().getProgram("object_basic");
+			glUseProgram(prog->id());
+			glUniform1i(prog->uniform("forceVertexColor"), _vertexOnly);
+			glUseProgram(0);
+			const auto prog1 = Resources::manager().getProgram("object_special");
+			glUseProgram(prog1->id());
+			glUniform1i(prog1->uniform("forceVertexColor"), _vertexOnly);
+			glUseProgram(0);
+		}
+		
 		if(ImGui::Checkbox("Default light", &_forceLighting)){
 			const auto prog = Resources::manager().getProgram("object_basic");
 			glUseProgram(prog->id());
@@ -141,6 +158,18 @@ void Renderer::draw(){
 			glUniform1i(prog1->uniform("forceLighting"), _forceLighting);
 			glUseProgram(0);
 		}
+		ImGui::SameLine();
+		if(ImGui::Checkbox("No lights", &_forceNoLighting)){
+			const auto prog = Resources::manager().getProgram("object_basic");
+			glUseProgram(prog->id());
+			glUniform1i(prog->uniform("forceNoLighting"), _forceNoLighting);
+			glUseProgram(0);
+			const auto prog1 = Resources::manager().getProgram("object_special");
+			glUseProgram(prog1->id());
+			glUniform1i(prog1->uniform("forceNoLighting"), _forceNoLighting);
+			glUseProgram(0);
+		}
+		
 		
 		ImGui::Checkbox("Culling", &_doCulling); ImGui::SameLine();
 		ImGui::PushItemWidth(90.0f);
@@ -160,7 +189,8 @@ void Renderer::draw(){
 			_camera.fov(_cameraFOV);
 		}
 		ImGui::PopItemWidth();
-		
+		ImGui::ColorEdit3("Background", &_clearColor[0]);
+		ImGui::Checkbox("Show cam. center", &_showDot);
 	}
 	ImGui::End();
 	
@@ -281,11 +311,20 @@ void Renderer::draw(){
 			}
 			
 			if(ImGui::InputInt("Part ID", &_subObjectId)){
+				if(_objectId < 0){
+					_objectId = 0;
+				}
 				_subObjectId = std::min(std::max(_subObjectId, -1), (int)_age->objects()[_objectId]->subObjects().size()-1);
 				_subLayerId = -1;
 			}
 			
 			if(ImGui::InputInt("Layer ID", &_subLayerId)){
+				if(_objectId < 0){
+					_objectId = 0;
+				}
+				if(_subObjectId < 0){
+					_subObjectId = 0;
+				}
 				_subLayerId = std::min(std::max(_subLayerId,-1), (int)_age->objects()[_objectId]->subObjects()[_subObjectId]->material->getLayers().size()-1);
 			}
 		} else if(_displayMode == OneTexture){
@@ -297,6 +336,8 @@ void Renderer::draw(){
 	}
 	ImGui::End();
 
+	glClearColor(_clearColor[0], _clearColor[1], _clearColor[2], 1.0f);
+	
 	// Display the texture fullscreen.
 	// TODO: handle aspect ratio.
 	if( _displayMode == OneTexture){
@@ -316,12 +357,13 @@ void Renderer::draw(){
 	_sceneFramebuffer->bind();
 	
 	glViewport(0, 0, GLsizei(_renderResolution[0]), GLsizei(_renderResolution[1]));
-	glClearColor(0.45f,0.45f, 0.5f, 1.0f);
+	
 	glClearDepth(1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	
 	
 	glEnable(GL_DEPTH_TEST);
+	glDisable(GL_BLEND);
 	checkGLError();
 	if(_displayMode == OneObject){
 		if(_objectId < _age->objects().size()){
@@ -413,21 +455,22 @@ void Renderer::draw(){
 
 	
 	// Render the camera cursor.
-	const float scale = glm::length(_camera.getDirection());
-	const glm::mat4 MVP = _camera.projection() * _camera.view() * glm::scale(glm::translate(glm::mat4(1.0f), _camera.getCenter()), glm::vec3(0.015f*scale));
-	const auto debugProgram = Resources::manager().getProgram("camera-center");
-	const auto debugObject = Resources::manager().getMesh("sphere");
-	
 	glDisable(GL_BLEND);
-	glEnable(GL_DEPTH_TEST);
-	glDisable(GL_CULL_FACE);
-	glUseProgram(debugProgram->id());
-	glBindVertexArray(debugObject.vId);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, debugObject.eId);
-	glUniformMatrix4fv(debugProgram->uniform("mvp"), 1, GL_FALSE, &MVP[0][0]);
-	glUniform2f(debugProgram->uniform("screenSize"), _config.screenResolution[0], _config.screenResolution[1]);
-	glDrawElements(GL_TRIANGLES, debugObject.count, GL_UNSIGNED_INT, (void*)0);
-	
+	if(_showDot){
+		glEnable(GL_DEPTH_TEST);
+		glDisable(GL_CULL_FACE);
+		const float scale = glm::length(_camera.getDirection());
+		const glm::mat4 MVP = _camera.projection() * _camera.view() * glm::scale(glm::translate(glm::mat4(1.0f), _camera.getCenter()), glm::vec3(0.015f*scale));
+		const auto debugProgram = Resources::manager().getProgram("camera-center");
+		const auto debugObject = Resources::manager().getMesh("sphere");
+		
+		glUseProgram(debugProgram->id());
+		glBindVertexArray(debugObject.vId);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, debugObject.eId);
+		glUniformMatrix4fv(debugProgram->uniform("mvp"), 1, GL_FALSE, &MVP[0][0]);
+		glUniform2f(debugProgram->uniform("screenSize"), _config.screenResolution[0], _config.screenResolution[1]);
+		glDrawElements(GL_TRIANGLES, debugObject.count, GL_UNSIGNED_INT, (void*)0);
+	}
 	// Reset state.
 	glBindVertexArray(0);
 	glUseProgram(0);

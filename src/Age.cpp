@@ -17,6 +17,11 @@
 #include <PRP/Surface/plBitmap.h>
 #include <PRP/Surface/plMipmap.h>
 #include <PRP/Surface/plCubicEnvironmap.h>
+#include <PRP/Light/plDirectionalLightInfo.h>
+#include <PRP/Light/plOmniLightInfo.h>
+#include <PRP/Light/plLightInfo.h>
+#include <PRP/Region/plSoftVolume.h>
+
 #include <Stream/plEncryptedStream.h>
 #include <Debug/plDebug.h>
 #include <Util/plPNG.h>
@@ -26,7 +31,9 @@
 #include <time.h>
 #include <fstream>
 
+#ifndef M_PI_2
 #define M_PI_2 1.57079632679489661923
+#endif
 
 unsigned int  kLiteMask = (plSpan::kLiteMaterial | plSpan::kLiteVtxPreshaded | plSpan::kLiteVtxNonPreshaded | plSpan::kLiteProjection | plSpan::kLiteShadowErase | plSpan::kLiteShadow);
 
@@ -49,7 +56,6 @@ Age::Age(const std::string & path){
 	_rm.reset(new plResManager());
 	
 	plAgeInfo* age = _rm->ReadAge(path, true);
-	
 	_name = age->getAgeName().to_std_string();
 	
 	Log::Info() << "Age " << _name << ": ";
@@ -70,6 +76,9 @@ Age::Age(const std::string & path){
 	
 	checkGLError();
 	Log::Info() << _objects.size() << " objects."  << std::endl;
+	std::sort(_objects.begin(), _objects.end(), [](const std::shared_ptr<Object> & left, const std::shared_ptr<Object> & right){
+		return left->getName() < right->getName();
+	});
 }
 
 Age::~Age(){
@@ -77,18 +86,82 @@ Age::~Age(){
 		obj->clean();
 	}
 	// Should clean the Age and everything.
+	_objects.clear();
+	if(_rm){
+		_rm->UnloadAge(_name);
+	}
+	_rm.reset();
+	
+	
 }
 
-
+void processLight(const plLightInfo * light, Light & newLight){
+	plDirectionalLightInfo * lightDir = plDirectionalLightInfo::Convert(light->getKey()->getObj(), false);
+	plSpotLightInfo * lightSpot = plSpotLightInfo::Convert(light->getKey()->getObj(), false);
+	plOmniLightInfo * lightOmni = plOmniLightInfo::Convert(light->getKey()->getObj(), false);
+	
+	const auto & lightToWorld = light->getLightToWorld();
+	
+	// Might have to rotate here.
+	const glm::vec3 lightDirection = -glm::vec3(lightToWorld(0,2), lightToWorld(1,2), lightToWorld(2,2));
+	const glm::vec3 lightPosition = glm::vec3(lightToWorld(0,3), lightToWorld(1,3), lightToWorld(2,3));
+	
+	
+	newLight.scale = 1.0f;
+	if(light->getSoftVolume().Exists()){
+		plSoftVolume * softVol = plSoftVolume::Convert(light->getSoftVolume()->getObj());
+		newLight.scale = softVol->getInsideStrength();
+	}
+	
+	
+	const auto & lAmbi = light->getAmbient();
+	const auto & lDiff = light->getDiffuse();
+	const auto & lSpec = light->getSpecular();
+	newLight.ambient = glm::vec3(lAmbi.r, lAmbi.g, lAmbi.b);
+	newLight.diffuse = glm::vec3(lDiff.r, lDiff.g, lDiff.b);
+	newLight.specular = glm::vec3(lSpec.r, lSpec.g, lSpec.b);
+	
+	if(lightDir != NULL){
+		newLight.constAtten = 1.0f;
+		newLight.linAtten = 0.0f;
+		newLight.quadAtten = 0.0f;
+		newLight.posdir = glm::vec4(lightDirection, 0.0f);
+		//Log::Info()  << " directional, " << std::flush;
+		newLight.type = Light::DIR;
+	} else if(lightSpot != NULL){
+		newLight.constAtten = lightSpot->getAttenConst();
+		newLight.linAtten = lightSpot->getAttenLinear();
+		newLight.quadAtten = lightSpot->getAttenQuadratic();
+		// TODO: fallof and cutoff.
+		//Log::Info()  << " spotlight, " << std::flush;
+		newLight.posdir = glm::vec4(lightPosition, 1.0f);
+		newLight.type = Light::SPOT;
+	} else if(lightOmni != NULL){
+		newLight.constAtten = lightOmni->getAttenConst();
+		newLight.linAtten = lightOmni->getAttenLinear();
+		newLight.quadAtten = lightOmni->getAttenQuadratic();
+		newLight.posdir = glm::vec4(lightPosition, 1.0f);
+		newLight.type = Light::OMNI;
+		//Log::Info()  << " omni, " << std::flush;
+	}
+}
 
 void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 	plSceneNode* scene = rm.getSceneNode(ploc);
+	
+	std::map<std::string, Light> globalLights;
+	std::map<std::string, bool> globalLightsUsed;
 	
 	if(scene){
 		Log::Mute();
 		
 		for(const auto & objKey : scene->getSceneObjects()){
 			plSceneObject* obj = plSceneObject::Convert(rm.getObject(objKey));
+			
+			// Skip geometry for now.
+			if(obj->getDrawInterface().Exists()){
+				continue;
+			}
 			
 			// Find the linking points.
 			if(objKey->getName().substr(0, 11) == "LinkInPoint" && obj->getCoordInterface().Exists()){
@@ -103,9 +176,35 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 				}
 			}
 			
+			Log::Unmute();
+			
+			
+			
+			if(!obj->getInterfaces().empty()){
+				for(const auto & interf : obj->getInterfaces()){
+					plLightInfo *light = plLightInfo::Convert(interf->getObj(), false);
+					if(light != NULL){
+						Light newLight;
+						processLight(light, newLight);
+						const std::string lightName = interf->getName().to_std_string();
+						globalLights[lightName] = newLight;
+						globalLightsUsed[lightName] = false;
+					}
+					
+				}
+			}
+			
+			Log::Mute();
+		}
+		
+		// Now look for geometry.
+		for(const auto & objKey : scene->getSceneObjects()){
+			plSceneObject* obj = plSceneObject::Convert(rm.getObject(objKey));
 			if(!obj->getDrawInterface().Exists()){
 				continue;
 			}
+			//Log::Info() << objKey->getName() << ", " << std::flush;
+			
 			plDrawInterface* draw = plDrawInterface::Convert(obj->getDrawInterface()->getObj());
 			
 			Object::Type type = Object::Default;
@@ -128,6 +227,7 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 			if(!bakePosition ){
 				plCoordinateInterface* coord = plCoordinateInterface::Convert(obj->getCoordInterface()->getObj());
 				hsMatrix44 localToWorld = coord->getLocalToWorld();
+				
 				model[0][0] = localToWorld(0,0); model[0][1] = localToWorld(1,0); model[0][2] = localToWorld(2,0); model[0][3] = localToWorld(3,0);
 				model[1][0] = localToWorld(0,1); model[1][1] = localToWorld(1,1); model[1][2] = localToWorld(2,1); model[1][3] = localToWorld(3,1);
 				model[2][0] = localToWorld(0,2); model[2][1] = localToWorld(1,2); model[2][2] = localToWorld(2,2); model[2][3] = localToWorld(3,2);
@@ -149,19 +249,31 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 				// A span group multiple objects data/assets.
 				plDrawableSpans* span = plDrawableSpans::Convert(draw->getDrawable(i)->getObj());
 				plDISpanIndex di = span->getDIIndex(draw->getDrawableKey(i));
+				// Fog color.
+				Log::Unmute();
+				const size_t numSpans = span->getNumSpans();
+				for(size_t spid = 0; spid <numSpans; ++spid){
+					if(span->getSpan(spid)->getFogEnvironment().Exists()){
+						plFogEnvironment* fog = plFogEnvironment::Convert(span->getSpan(spid)->getFogEnvironment()->getObj());
+						Log::Info() << "Fog: " << fog->getColor() << std::endl;
+					}
+				}
+				const auto & sourceSpans = span->getSourceSpans();
+				const size_t snumSpans = sourceSpans.size();
+				for(size_t spid = 0; spid <snumSpans; ++spid){
+					if(span->getSourceSpans()[spid]->getFogEnvironment().Exists()){
+						plFogEnvironment* fog = plFogEnvironment::Convert(span->getSourceSpans()[spid]->getFogEnvironment()->getObj());
+						Log::Info() << "SFog: " << fog->getColor() << std::endl;
+					}
+				}
 				
+				Log::Mute();
 				// Ignore matrix-only span element.
 				if ((di.fFlags & plDISpanIndex::kMatrixOnly) != 0){
 					continue;
 				}
 				
-				// Fog color.
-				Log::Unmute();
-				if(span->getSpan(0)->getFogEnvironment().Exists()){
-					plFogEnvironment* fog = plFogEnvironment::Convert(span->getSpan(0)->getFogEnvironment()->getObj());
-					Log::Info() << fog->getColor() << std::endl;
-				}
-				Log::Mute();
+				
 				
 				// Each of these will be a subobject.
 				for(size_t id = 0; id < di.fIndices.size(); ++id){
@@ -169,6 +281,7 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 
 					// Get the mesh internal representation.
 					plIcicle* ice = span->getIcicle(di.fIndices[id]);
+				
 					const hsMatrix44 transfoMatrix = (bakePosition ? ice->getLocalToWorld() : hsMatrix44::Identity());
 					hsMatrix44 transfoMatrixNormal = transfoMatrix;
 					transfoMatrixNormal.setTranslate(hsVector3(0.0f,0.0f,0.0f));
@@ -234,13 +347,32 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 							}
 							Log::Info() << std::endl;
 						}
+						
 					}
+					
+					
+					// Lights
+					Log::Unmute();
+					const auto & permalights = ice->getPermaLights();
+					std::vector<Light> lights;
+					for(const auto & lightKey : permalights){
+						plLightInfo *light = plLightInfo::Convert(lightKey->getObj());
+						Light newLight;
+						processLight(light, newLight);
+						lights.push_back(newLight);
+						const std::string lightName = lightKey->getName().to_std_string();
+						globalLightsUsed[lightName] = true;
+					}
+					
+					
+					
+					Log::Mute();
 					
 					// Add subobject to current object.
 					const MeshInfos mesh = Resources::manager().registerMesh(fileName, meshIndices, meshPositions, meshNormals, meshColors, meshUVs);
 					auto * matObj = hsGMaterial::Convert(matKey->getObj(), false);
 					if(matObj){
-						_objects.back()->addSubObject(mesh, matObj, shadingMode);
+						_objects.back()->addSubObject(mesh, matObj, lights, shadingMode);
 					}
 				}
 			}
@@ -249,7 +381,23 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 		Log::Unmute();
 	}
 	
+	
+	//Log::Unmute();
 	Log::Mute();
+	int lightsCount = 0;
+	for(const auto & globLight : globalLightsUsed){
+		if(globLight.second){
+			continue;
+		}
+		Log::Info() << "Global light: " << globLight.first << std::endl;
+		++lightsCount;
+	}
+	if(lightsCount != 0){
+		Log::Info() << lightsCount << " / " << globalLightsUsed.size() << " lights are not used." << std::endl;
+	}
+	
+	
+	
 	
 	// Extract textures.
 	const auto textureKeys = rm.getKeys(ploc, pdUnifiedTypeMap::ClassIndex("plMipmap"));
