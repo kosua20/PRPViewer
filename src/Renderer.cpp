@@ -36,7 +36,8 @@ Renderer::Renderer(Config & config) : _config(config) {
 	_cameraFOV = 1.3f;
 	_camera.projection(config.screenResolution[0]/config.screenResolution[1], _cameraFOV, 0.1f, _cameraFarPlane);
 	
-	_sceneFramebuffer = std::make_shared<Framebuffer>(_renderResolution[0], _renderResolution[1], GL_RGB, GL_UNSIGNED_BYTE, GL_RGB8, GL_LINEAR, GL_CLAMP_TO_EDGE, true);
+	_sceneFramebuffer = std::make_shared<Framebuffer>(_renderResolution[0], _renderResolution[1], GL_RGB8, true);
+	//_sceneFramebuffer = std::make_shared<Framebuffer>(_renderResolution[0], _renderResolution[1], GL_RGB, GL_UNSIGNED_BYTE, GL_RGB8, GL_LINEAR, GL_CLAMP_TO_EDGE, true);
 	
 	Resources::manager().getProgram("object_basic")->registerTexture("textures", 0);
 	Resources::manager().getProgram("object_basic")->registerTexture("cubemaps", 1);
@@ -48,7 +49,7 @@ Renderer::Renderer(Config & config) : _config(config) {
 	
 	_age = std::make_shared<Age>();
 	_resolutionScaling = 100.0f;
-	//loadAge("../../../data/uru/spyroom.age");
+	
 	_clearColor[0] = _clearColor[1] = _clearColor[2] = 0.5f;
 	_vertexOnly = false;
 	_forceNoLighting = false;
@@ -454,7 +455,7 @@ void Renderer::draw(){
 	}
 
 	
-	// Render the camera cursor.
+	// Render the camera cursor, in the scene framebuffer to get depth occlusion to help the user locate herself.
 	glDisable(GL_BLEND);
 	if(_showDot){
 		glEnable(GL_DEPTH_TEST);
@@ -480,8 +481,9 @@ void Renderer::draw(){
 	_sceneFramebuffer->unbind();
 	
 	glViewport(0,0, _config.screenResolution[0], _config.screenResolution[1]);
-	(_wireframe ? _quad : _fxaaquad).draw(_sceneFramebuffer->textureId(), 1.0f/_config.screenResolution);
 	
+	(_wireframe ? _quad : _fxaaquad).draw(_sceneFramebuffer->textureId(), 1.0f/_config.screenResolution);
+
 	checkGLError();
 }
 

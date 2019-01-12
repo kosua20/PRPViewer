@@ -199,6 +199,8 @@ public:
 	
 	static void saveDefaultFramebuffer(const unsigned int width, const unsigned int height, const std::string & path);
 	
+	static void getTypeAndFormat(const GLuint typedFormat, GLuint & type, GLuint & format);
+	
 };
 
 
