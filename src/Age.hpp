@@ -9,6 +9,7 @@
 
 class plResManager;
 class plLocation;
+class plFogEnvironment;
 
 class Age {
 public:
@@ -46,7 +47,14 @@ public:
 	
 	const size_t maxLayer(){
 		return _maxLayer;
+	}
 	
+	const glm::vec3 & clearColor(){
+		return _clearColor;
+	}
+	
+	const plFogEnvironment * getFog(){
+		return _fogEnv;
 	}
 	
 private:
@@ -62,7 +70,11 @@ private:
 	std::map<std::string, glm::vec3> _linkingPoints;
 	std::vector<std::string> _linkingNamesCache;
 	
+	glm::vec3 _clearColor;
+	
 	size_t _maxLayer = 0;
+	
+	plFogEnvironment * _fogEnv;
 };
 
 #endif

@@ -21,7 +21,7 @@
 #include <PRP/Light/plOmniLightInfo.h>
 #include <PRP/Light/plLightInfo.h>
 #include <PRP/Region/plSoftVolume.h>
-
+#include <PRP/Message/plConsoleMsg.h>
 #include <Stream/plEncryptedStream.h>
 #include <Debug/plDebug.h>
 #include <Util/plPNG.h>
@@ -42,6 +42,21 @@ unsigned char reverse(unsigned char b) {
 	b = (b & 0xCC) >> 2 | (b & 0x33) << 2;
 	b = (b & 0xAA) >> 1 | (b & 0x55) << 1;
 	return b;
+}
+
+std::vector<std::string> split(const std::string & str){
+	std::vector<std::string> tokens;
+	
+	std::string::size_type currSpacePos = 0;
+	std::string::size_type nextSpacePos = str.find(" ");
+
+	while(nextSpacePos != std::string::npos){
+		tokens.emplace_back(str.substr(currSpacePos, nextSpacePos - currSpacePos));
+		currSpacePos = nextSpacePos+1;
+		nextSpacePos = str.find(" ", currSpacePos);
+	}
+	tokens.emplace_back(str.substr(currSpacePos));
+	return tokens;
 }
 
 
@@ -79,6 +94,101 @@ Age::Age(const std::string & path){
 	std::sort(_objects.begin(), _objects.end(), [](const std::shared_ptr<Object> & left, const std::shared_ptr<Object> & right){
 		return left->getName() < right->getName();
 	});
+	
+	// Load fog infos. (see issue #1)
+	_clearColor = glm::vec3(0.2f, 0.2f, 0.2f);
+	_fogEnv = new plFogEnvironment();
+	_fogEnv->init("commonFog");
+	_fogEnv->setType(plFogEnvironment::kNoFog);
+	
+	
+	hsStream* S;
+	const std::string fniPath = path.substr(0, path.find_last_of(".")) + ".fni";
+	
+	bool opened = false;
+	if (plEncryptedStream::IsFileEncrypted(fniPath)) {
+		S = new plEncryptedStream();
+		opened = ((plEncryptedStream*)S)->open(fniPath, fmRead, plEncryptedStream::kEncAuto);
+	} else {
+		S = new hsFileStream();
+		opened = ((hsFileStream*)S)->open(fniPath, fmRead);
+	}
+	
+	if(opened){
+		float yonSet = 0.0f;
+		while (!S->eof()) {
+			const std::string line = S->readLine().to_std_string();
+			
+			if(line.empty() || line[0] == '#'){
+				continue;
+			}
+			
+			std::string::size_type spacePos = line.find_first_of(" ");
+			if(spacePos == std::string::npos){
+				continue;
+			}
+			const std::string command = line.substr(0, spacePos);
+			if(command == "Graphics.Renderer.SetClearColor"){
+				const std::vector<std::string> argsCommand = split(line.substr(spacePos+1));
+				if(argsCommand.size() != 3){
+					continue;
+				}
+				_clearColor[0] = std::stof(argsCommand[0]);
+				_clearColor[1] = std::stof(argsCommand[1]);
+				_clearColor[2] = std::stof(argsCommand[2]);
+				
+			} else if(command == "Graphics.Renderer.Fog.SetDefColor"){
+				const std::vector<std::string> argsCommand = split(line.substr(spacePos+1));
+				if(argsCommand.size() != 3){
+					continue;
+				}
+				const float c0 = std::stof(argsCommand[0]);
+				const float c1 = std::stof(argsCommand[1]);
+				const float c2 = std::stof(argsCommand[2]);
+				_fogEnv->setColor(hsColorRGBA(c0, c1, c2, 1.0f));
+			}  else if(command == "Graphics.Renderer.Fog.SetDefLinear"){
+				const std::vector<std::string> argsCommand = split(line.substr(spacePos+1));
+				if(argsCommand.size() != 3){
+					continue;
+				}
+				_fogEnv->setType(plFogEnvironment::kLinearFog);
+				_fogEnv->setStart(std::stof(argsCommand[0]));
+				_fogEnv->setEnd(std::stof(argsCommand[1]));
+				_fogEnv->setDensity(std::stof(argsCommand[2]));
+			} else if(command == "Graphics.Renderer.Setyon"){
+				const std::vector<std::string> argsCommand = split(line.substr(spacePos+1));
+				if(argsCommand.size() != 1){
+					continue;
+				}
+				yonSet = std::stof(argsCommand[0]);
+			} else if(command == "Graphics.Renderer.Fog.SetDefExp"){
+				const std::vector<std::string> argsCommand = split(line.substr(spacePos+1));
+				if(argsCommand.size() != 2){
+					continue;
+				}
+				_fogEnv->setType(plFogEnvironment::kExpFog);
+				_fogEnv->setEnd(std::stof(argsCommand[0]));
+				_fogEnv->setDensity(std::stof(argsCommand[1]));
+			} else if(command == "Graphics.Renderer.Fog.SetDefExp2"){
+				const std::vector<std::string> argsCommand = split(line.substr(spacePos+1));
+				if(argsCommand.size() != 2){
+					continue;
+				}
+				_fogEnv->setType(plFogEnvironment::kExp2Fog);
+				_fogEnv->setEnd(std::stof(argsCommand[0]));
+				_fogEnv->setDensity(std::stof(argsCommand[1]));
+			}
+		}
+		if(yonSet != 0.0f && _fogEnv->getStart() >= 0.0f){
+			const float newStart = yonSet * (1.0f - _fogEnv->getStart());
+			_fogEnv->setStart(newStart);
+			_fogEnv->setEnd(yonSet);
+			_fogEnv->setDensity(1.0f);
+			_fogEnv->setColor(hsColorRGBA(_clearColor[0], _clearColor[1], _clearColor[2], 1.0f));
+			
+		}
+	}
+	
 }
 
 Age::~Age(){
@@ -251,21 +361,21 @@ void Age::loadMeshes(plResManager & rm, const plLocation& ploc){
 				plDISpanIndex di = span->getDIIndex(draw->getDrawableKey(i));
 				// Fog color.
 				Log::Unmute();
-				const size_t numSpans = span->getNumSpans();
-				for(size_t spid = 0; spid <numSpans; ++spid){
-					if(span->getSpan(spid)->getFogEnvironment().Exists()){
-						plFogEnvironment* fog = plFogEnvironment::Convert(span->getSpan(spid)->getFogEnvironment()->getObj());
-						Log::Info() << "Fog: " << fog->getColor() << std::endl;
-					}
-				}
-				const auto & sourceSpans = span->getSourceSpans();
-				const size_t snumSpans = sourceSpans.size();
-				for(size_t spid = 0; spid <snumSpans; ++spid){
-					if(span->getSourceSpans()[spid]->getFogEnvironment().Exists()){
-						plFogEnvironment* fog = plFogEnvironment::Convert(span->getSourceSpans()[spid]->getFogEnvironment()->getObj());
-						Log::Info() << "SFog: " << fog->getColor() << std::endl;
-					}
-				}
+//				const size_t numSpans = span->getNumSpans();
+//				for(size_t spid = 0; spid <numSpans; ++spid){
+//					if(span->getSpan(spid)->getFogEnvironment().Exists()){
+//						plFogEnvironment* fog = plFogEnvironment::Convert(span->getSpan(spid)->getFogEnvironment()->getObj());
+//						Log::Info() << "Fog: " << fog->getColor() << std::endl;
+//					}
+//				}
+//				const auto & sourceSpans = span->getSourceSpans();
+//				const size_t snumSpans = sourceSpans.size();
+//				for(size_t spid = 0; spid <snumSpans; ++spid){
+//					if(span->getSourceSpans()[spid]->getFogEnvironment().Exists()){
+//						plFogEnvironment* fog = plFogEnvironment::Convert(span->getSourceSpans()[spid]->getFogEnvironment()->getObj());
+//						Log::Info() << "SFog: " << fog->getColor() << std::endl;
+//					}
+//				}
 				
 				Log::Mute();
 				// Ignore matrix-only span element.

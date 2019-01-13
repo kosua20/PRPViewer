@@ -443,6 +443,11 @@ void Object::shadeState(const std::shared_ptr<ProgramInfos> & program, plLayerIn
 		default:
 			break;
 	}
+	if((fshade & hsGMatState::kShadeReallyNoFog) || (fshade & hsGMatState::kShadeNoFog) || (fshade & hsGMatState::kShadeEmissive)){
+		glUniform1i(program->uniform("fogEnabled"),0);
+	} else {
+		glUniform1i(program->uniform("fogEnabled"),1);
+	}
 	checkGLError();
 }
 

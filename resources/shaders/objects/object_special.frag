@@ -26,6 +26,11 @@ uniform bool blendNoTexAlpha;
 uniform float alphaThreshold;
 uniform bool forceVertexColor = false;
 
+uniform bool fogEnabled = false;
+uniform int fogMode = 3;
+uniform vec3 fogInfos = vec3(-1500.0, 2000.0, 1.0);
+uniform vec3 fogColor = vec3(0.4, 0.3, 0.1);
+
 out vec4 fragColor;
 
 void main(){
@@ -64,6 +69,21 @@ void main(){
 	if(fCurrAlpha < alphaThreshold){
 		// if the test doesn't pass, discard.
 		discard;
+	}
+
+	if(fogEnabled){
+		if(fogMode == 0){
+			float fogFactor = (fogInfos.y - length(In.camPos.xyz))/(fogInfos.y - fogInfos.x); 
+			fCurrColor = mix(fogColor, fCurrColor, fogFactor); 
+		} else if (fogMode == 1){
+			float d = length(In.camPos.xyz) * fogInfos.z;
+			float fogFactor = 1.0 / exp(d); 
+			fCurrColor = mix(fogColor, fCurrColor, fogFactor); 
+		} else if (fogMode == 2){
+			float d = length(In.camPos.xyz) * fogInfos.z;
+			float fogFactor = 1.0 / exp(d*d); 
+			fCurrColor = mix(fogColor, fCurrColor, fogFactor); 
+		}
 	}
 
 	fragColor = vec4(fCurrColor, fCurrAlpha);

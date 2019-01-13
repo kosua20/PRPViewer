@@ -4,6 +4,7 @@
 #include "helpers/InterfaceUtilities.hpp"
 #include "helpers/Logger.hpp"
 #include <PRP/Surface/hsGMaterial.h>
+#include <PRP/Misc/plFogEnvironment.h>
 #include <glm/gtx/norm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <stdio.h>
@@ -498,6 +499,27 @@ void Renderer::loadAge(const std::string & path){
 	_age.reset(new Age(path));
 	// A Uru human is around 4/5 units in height apparently.
 	_camera.setCenter(_age->getDefaultLinkingPoint());
+	// Pass clear color.
+	_clearColor[0] = _age->clearColor()[0];
+	_clearColor[1] = _age->clearColor()[1];
+	_clearColor[2] = _age->clearColor()[2];
+	
+	// Set fog parameters in shaders.
+	const auto * fog = _age->getFog();
+	const auto prog = Resources::manager().getProgram("object_basic");
+	glUseProgram(prog->id());
+	glUniform1i(prog->uniform("fogEnabled"), 1);
+	glUniform1i(prog->uniform("fogMode"), int(fog->getType()));
+	glUniform3f(prog->uniform("fogColor"), fog->getColor().r, fog->getColor().g, fog->getColor().b);
+	glUniform3f(prog->uniform("fogInfos"), fog->getStart(), fog->getEnd(), fog->getDensity());
+	glUseProgram(0);
+	const auto prog1 = Resources::manager().getProgram("object_special");
+	glUseProgram(prog1->id());
+	glUniform1i(prog1->uniform("fogEnabled"), 1);
+	glUniform1i(prog1->uniform("fogMode"), int(fog->getType()));
+	glUniform3f(prog1->uniform("fogColor"), fog->getColor().r, fog->getColor().g, fog->getColor().b);
+	glUniform3f(prog1->uniform("fogInfos"), fog->getStart(), fog->getEnd(), fog->getDensity());
+	glUseProgram(0);
 }
 void Renderer::update(){
 	if(Input::manager().resized()){
