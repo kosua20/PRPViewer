@@ -179,13 +179,17 @@ Age::Age(const std::string & path){
 				_fogEnv->setDensity(std::stof(argsCommand[1]));
 			}
 		}
-		if(yonSet != 0.0f && _fogEnv->getStart() >= 0.0f){
+		if(yonSet != 0.0f && _fogEnv->getStart() > 0.0f){
 			const float newStart = yonSet * (1.0f - _fogEnv->getStart());
 			_fogEnv->setStart(newStart);
 			_fogEnv->setEnd(yonSet);
 			_fogEnv->setDensity(1.0f);
 			_fogEnv->setColor(hsColorRGBA(_clearColor[0], _clearColor[1], _clearColor[2], 1.0f));
 			
+		}
+		
+		if(_fogEnv->getStart() == _fogEnv->getEnd()){
+			_fogEnv->setType(plFogEnvironment::kNoFog);
 		}
 	}
 	
