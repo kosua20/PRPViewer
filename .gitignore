@@ -11,3 +11,8 @@ ext/
 */xcuserdata/*
 binaries/
 data/
+/external/glfw_build/
+/external/string_theory_build/
+/external/libjpeg-turbo_build/
+/external/install/
+/external/libhsplasma_build/
