@@ -13,3 +13,7 @@ More information in this series of blog posts:
 ![Result 2](images/result1.jpg)
 ![Result 3](images/result2.jpg)
 ![Result 4](images/result3.jpg)
+
+# License
+Libraries in `src/libs/*` and `external/*` remain under their respective licenses.
+This work is based on the awesome [libhsplasma](https://github.com/H-uru/libhsplasma) project, licensed under GPLv3. PRPViewer is thus also licensed under the [GPLv3](https://github.com/kosua20/PRPViewer/blob/master/LICENSE).
