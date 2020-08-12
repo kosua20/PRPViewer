@@ -60,7 +60,7 @@ void logCompFlags(unsigned int cflags){
 
 std::string logLayer(plLayerInterface * lay){
 	std::string layerString;
-	if(lay->getTexture() != NULL){
+	if(lay->getTexture().Exists()){
 		layerString.append("Texture: " + lay->getTexture()->getName().to_std_string() + ", LOD bias " + std::to_string(lay->getLODBias()) + ").\n");
 	}
 	
