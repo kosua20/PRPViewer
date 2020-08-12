@@ -1,3 +1,9 @@
 [submodule "external/glfw"]
 	path = external/glfw
 	url = https://github.com/glfw/glfw/
+[submodule "external/string_theory"]
+	path = external/string_theory
+	url = https://github.com/zrax/string_theory.git
+[submodule "external/libjpeg-turbo"]
+	path = external/libjpeg-turbo
+	url = https://github.com/libjpeg-turbo/libjpeg-turbo.git
