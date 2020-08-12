@@ -1,53 +1,24 @@
-cmake_minimum_required(VERSION 2.8)
-include(ExternalProject)
+cmake_minimum_required(VERSION 3.14)
 
 project("PrpViewer")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
+set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_BUILD_TYPE "Release")
+if(MSVC)
+    add_definitions(-D_CRT_SECURE_NO_WARNINGS)
+endif()
 
 # Paths
 SET(CMAKE_INSTALL_PREFIX ${PROJECT_BINARY_DIR})
 SET(EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR}/bin)
 SET(LIBRARY_OUTPUT_PATH ${CMAKE_BINARY_DIR}/lib)
-
-
-# libHSPlasma
-ExternalProject_Add(libhsplasmaext
-    DOWNLOAD_COMMAND ""
-    SOURCE_DIR ../external/libhsplasma
-    INSTALL_DIR ${PROJECT_BINARY_DIR}
-    CMAKE_ARGS 
-        -DCMAKE_INSTALL_PREFIX:PATH=<INSTALL_DIR> 
-        -DOPENSSL_ROOT_DIR:PATH=/usr/local/opt/openssl
-        -DBUILD_SHARED_LIBS=OFF
-        -DENABLE_PHYSX=OFF
-        -DENABLE_PYTHON=OFF
-        -DENABLE_NET=OFF
-        -DENABLE_TOOLS=OFF)
-
-include_directories(${PROJECT_BINARY_DIR}/include/HSPlasma)
-set(HSPLASMA_LIB ${PROJECT_BINARY_DIR}/lib/libHSPlasma.a)
-
-set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
-set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-add_subdirectory(external/glfw)
+set(CMAKE_PREFIX_PATH "${CMAKE_CURRENT_LIST_DIR}/external/install/lib/cmake/;${CMAKE_CURRENT_LIST_DIR}/external/install/lib/pkgconfig;${CMAKE_CURRENT_LIST_DIR}/external/install/share/cmake/HSPlasma/")
 
 # Dependencies
-find_package(ZLIB REQUIRED)
-find_package(JPEG REQUIRED)
 find_package(PNG REQUIRED)
-find_package(Threads REQUIRED)
-find_package(string_theory 1.5 REQUIRED)
-add_definitions(-DST_NO_2_0_DEPRECATION)
-#find_package(OpenGL REQUIRED)
+find_package(HSPlasma REQUIRED)
 find_package(Boost COMPONENTS system filesystem REQUIRED)
-
-if(APPLE)
-	find_library(CORE_FOUNDATION CoreFoundation)
-	if (NOT CORE_FOUNDATION)
-		message(FATAL_ERROR "CoreFoundation not found")
-	endif()
-endif()
+find_package(glfw3 REQUIRED)
+find_package(string_theory REQUIRED)
 
 # Project
 file(GLOB_RECURSE SOURCES src/*.c* RECURSE)
@@ -65,12 +36,11 @@ file(GLOB BASE_FILES src/*)
 source_group("" FILES ${BASE_FILES})
 include_directories(src/libs)
 set(SOURCE_FILES ${SOURCES} ${HEADERS} )
+
 add_executable(PrpViewer ${SOURCE_FILES})
 
-add_dependencies(PrpViewer libhsplasmaext)
-target_link_libraries(PrpViewer ${PNG_LIBRARIES} ${JPEG_LIBRARIES} ${ZLIB_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${STRING_THEORY_LIBRARIES} ${HSPLASMA_LIB} )
-target_link_libraries(PrpViewer glfw ${Boost_SYSTEM_LIBRARY} ${Boost_FILESYSTEM_LIBRARY} )
-if(APPLE)
-	target_link_libraries(PrpViewer ${CORE_FOUNDATION})
-endif()
+target_include_directories(PrpViewer PUBLIC ${HSPlasma_INCLUDE_DIRS} ${CMAKE_CURRENT_LIST_DIR}/external/install/include ${PNG_PNG_INCLUDE_DIR})
+
+target_link_libraries(PrpViewer HSPlasma glfw ${PNG_LIBRARIES} ${STRING_THEORY_LIBRARIES} ${Boost_SYSTEM_LIBRARY} ${Boost_FILESYSTEM_LIBRARY} ) 
+
 install(TARGETS PrpViewer RUNTIME DESTINATION bin)
