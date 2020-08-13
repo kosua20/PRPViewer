@@ -118,7 +118,7 @@ void Renderer::draw(){
 			ImGui::OpenFilePicker("Load Age");
 		}
 		std::string selectedFile;
-		if(ImGui::BeginFilePicker("Load Age", "Load a .age file.", "../../../data/", selectedFile, false, false, {"age"})){
+		if(ImGui::BeginFilePicker("Load Age", "Load a .age file.", "./", selectedFile, false, false, {"age"})){
 			loadAge(selectedFile);
 			current_item_id = 0;
 			

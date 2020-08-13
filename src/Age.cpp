@@ -69,7 +69,6 @@ Age::Age(const std::string & path){
 	
 	const PlasmaVer plasmaVersion = PlasmaVer::pvMoul;
 	_rm.reset(new plResManager());
-	
 	plAgeInfo* age = _rm->ReadAge(path, true);
 	_name = age->getAgeName().to_std_string();
 	

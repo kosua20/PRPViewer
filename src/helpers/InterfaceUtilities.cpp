@@ -8,7 +8,13 @@ namespace ImGui {
 
 	bool directoryExists(const std::string& path) {
 		fs::path p(path);
-		return fs::exists(p) && fs::is_directory(path);
+		bool exists = false;
+		try {
+			exists = fs::exists(p) && fs::is_directory(path);
+		} catch(...) {
+			
+		}
+		return exists;
 	}
 
 	bool fileExists(const std::string& path){
@@ -331,7 +337,9 @@ namespace ImGui {
 				if (saveMode || filePickerInternals.currentFileId >= 0) {
 					// Build it path and store it.
 					const std::string finalFileName = saveMode ? std::string(filePickerInternals.newName) : std::string(filePickerInternals.rawItems[filePickerInternals.currentFileId]);
-					filePickerInternals.currentResult = filePickerInternals.currentDir.string() + "/" + finalFileName;
+					auto filePath = filePickerInternals.currentDir;
+					filePath.append(finalFileName);
+					filePickerInternals.currentResult = filePath.string();
 					// If the file already exists, warn the user.
 					if (saveMode && (fileExists(filePickerInternals.currentResult) || directoryExists(filePickerInternals.currentResult))) {
 						ImGui::OpenPopup("Warning!##Popup");
