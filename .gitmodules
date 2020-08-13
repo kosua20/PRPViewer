@@ -10,3 +10,9 @@
 [submodule "external/libhsplasma"]
 	path = external/libhsplasma
 	url = https://github.com/H-uru/libhsplasma.git
+[submodule "external/zlib"]
+	path = external/zlib
+	url = https://github.com/madler/zlib.git
+[submodule "external/libpng"]
+	path = external/libpng
+	url = https://github.com/glennrp/libpng.git

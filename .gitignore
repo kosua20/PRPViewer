@@ -16,3 +16,4 @@ data/
 /external/libjpeg-turbo_build/
 /external/install/
 /external/libhsplasma_build/
+/external/*_build/
