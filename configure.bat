@@ -33,7 +33,7 @@ rm install/lib/zlib.lib
 
 mkdir libpng_build
 cd libpng_build
-cmake -DCMAKE_BUILD_TYPE=Release -DPNG_SHARED=OFF -DPNGSTATIC=ON -DPNG_EXECUTABLES=OFF -DPNG_TESTS=OFF -DCMAKE_PREFIX_PATH="../install/share/pkgconfig/;../install/;" -DCMAKE_INSTALL_PREFIX="../install/" ../libpng/
+cmake -DCMAKE_BUILD_TYPE=Release -DPNG_SHARED=OFF -DPNG_STATIC=ON -DPNG_EXECUTABLES=OFF -DPNG_TESTS=OFF -DCMAKE_PREFIX_PATH="../install/share/pkgconfig/;../install/;" -DCMAKE_INSTALL_PREFIX="../install/" ../libpng/
 cmake --build ./ --config Release
 cmake --install ./
 
