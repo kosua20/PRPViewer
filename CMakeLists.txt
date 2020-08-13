@@ -16,7 +16,6 @@ set(CMAKE_PREFIX_PATH "${CMAKE_CURRENT_LIST_DIR}/external/install/lib/cmake/;${C
 # Dependencies
 find_package(PNG REQUIRED)
 find_package(HSPlasma REQUIRED)
-find_package(Boost COMPONENTS system filesystem REQUIRED)
 find_package(glfw3 REQUIRED)
 find_package(string_theory REQUIRED)
 
@@ -41,6 +40,6 @@ add_executable(PrpViewer ${SOURCE_FILES})
 
 target_include_directories(PrpViewer PUBLIC ${HSPlasma_INCLUDE_DIRS} ${CMAKE_CURRENT_LIST_DIR}/external/install/include ${PNG_PNG_INCLUDE_DIR})
 
-target_link_libraries(PrpViewer HSPlasma glfw ${PNG_LIBRARIES} ${STRING_THEORY_LIBRARIES} ${Boost_SYSTEM_LIBRARY} ${Boost_FILESYSTEM_LIBRARY} ) 
+target_link_libraries(PrpViewer HSPlasma glfw ${PNG_LIBRARIES} ${STRING_THEORY_LIBRARIES}) 
 
 install(TARGETS PrpViewer RUNTIME DESTINATION bin)

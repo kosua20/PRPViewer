@@ -1,23 +1,25 @@
 #include "InterfaceUtilities.hpp"
 #include <iostream>
-#include <boost/filesystem.hpp>
+#include <ghc/filesystem.hpp>
+
+namespace fs = ghc::filesystem;
 
 namespace ImGui {
 
 	bool directoryExists(const std::string& path) {
-		boost::filesystem::path p(path);
-		return boost::filesystem::exists(p) && boost::filesystem::is_directory(path);
+		fs::path p(path);
+		return fs::exists(p) && fs::is_directory(path);
 	}
 
 	bool fileExists(const std::string& path){
-		boost::filesystem::path p(path);
-		return boost::filesystem::exists(p) && boost::filesystem::is_regular_file(path);
+		fs::path p(path);
+		return fs::exists(p) && fs::is_regular_file(path);
 	}
 
 	void makeDirectory(const std::string& path){
-		boost::filesystem::path p(path);
-		if (boost::filesystem::exists(p) == false) {
-			boost::filesystem::create_directories(p);
+		fs::path p(path);
+		if (fs::exists(p) == false) {
+			fs::create_directories(p);
 		}	
 	}
 
@@ -30,15 +32,15 @@ namespace ImGui {
 		bool shouldCheckExtension = !allowedExtensions.empty();
 
 		try {
-			boost::filesystem::directory_iterator end_iter;
-			for (boost::filesystem::directory_iterator dir_itr(path); dir_itr != end_iter; ++dir_itr) {
+			fs::directory_iterator end_iter;
+			for (fs::directory_iterator dir_itr(path); dir_itr != end_iter; ++dir_itr) {
 
 				const std::string itemName = dir_itr->path().filename().string();
-				if (includeSubdirectories && boost::filesystem::is_directory(dir_itr->status())) {
+				if (includeSubdirectories && fs::is_directory(dir_itr->status())) {
 					if (listHidden || (itemName.size() > 0 && itemName.at(0) != '.')) {
 						files.push_back(itemName);
 					}
-				} else if (boost::filesystem::is_regular_file(dir_itr->status())) {
+				} else if (fs::is_regular_file(dir_itr->status())) {
 					bool shouldKeep = !shouldCheckExtension;
 					if (shouldCheckExtension) {
 						for (const auto & allowedExtension : allowedExtensions) {
@@ -54,7 +56,7 @@ namespace ImGui {
 					}
 				}
 			}
-		} catch (const boost::filesystem::filesystem_error& ex) {
+		} catch (const fs::filesystem_error& ex) {
 			std::cout << "Can't access or find directory." << std::endl;
 		}
 
@@ -72,17 +74,17 @@ namespace ImGui {
 
 
 		try {
-			boost::filesystem::directory_iterator end_iter;
-			for (boost::filesystem::directory_iterator dir_itr(path); dir_itr != end_iter; ++dir_itr) {
+			fs::directory_iterator end_iter;
+			for (fs::directory_iterator dir_itr(path); dir_itr != end_iter; ++dir_itr) {
 
 				const std::string itemName = dir_itr->path().filename().string();
-				if (boost::filesystem::is_directory(dir_itr->status())) {
+				if (fs::is_directory(dir_itr->status())) {
 					if (listHidden || (itemName.size() > 0 && itemName.at(0) != '.')) {
 						dirs.push_back(itemName);
 					}
 				}
 			}
-		} catch (const boost::filesystem::filesystem_error& ex) {
+		} catch (const fs::filesystem_error& ex) {
 			std::cout << "Can't access or find directory." << std::endl;
 		}
 
@@ -100,7 +102,7 @@ namespace ImGui {
 	// true if a file/directory has been selected.
 
 	struct FilePickerInternal {
-		boost::filesystem::path currentDir;
+		fs::path currentDir;
 		std::vector<std::string> items = {};
 		std::vector<char*> rawItems = {};
 		std::vector<std::string> dirs = {};
@@ -144,7 +146,7 @@ namespace ImGui {
 		if (filePickerInternals.initPopup) {
 			filePickerInternals.initPopup = false;
 			shouldUpdate = true;
-			filePickerInternals.currentDir = boost::filesystem::canonical(directoryPath);
+			filePickerInternals.currentDir = fs::canonical(directoryPath);
 #ifdef _WIN32
 			strcpy_s(filePickerInternals.newName, 128, "New file name");
 #else
@@ -225,9 +227,9 @@ namespace ImGui {
 						newPathString += "/";
 					}
 					if (directoryExists(newPathString)) {
-						filePickerInternals.currentDir = boost::filesystem::canonical(boost::filesystem::path(newPathString));
+						filePickerInternals.currentDir = fs::canonical(fs::path(newPathString));
 						if (filePickerInternals.currentDir != filePickerInternals.currentDir.root_path()) {
-							filePickerInternals.currentDir.remove_trailing_separator();
+							filePickerInternals.currentDir = fs::canonical(filePickerInternals.currentDir);
 						}
 						shouldUpdate = true;
 						ImGui::CloseCurrentPopup();
@@ -263,7 +265,7 @@ namespace ImGui {
 				ImGui::PopItemWidth();
 				// If ok, create directory using utility, update lists.
 				if (ImGui::Button("OK", ImVec2(120, 0))) {
-					const boost::filesystem::path tempPath = filePickerInternals.currentDir.append(filePickerInternals.newDir);
+					const fs::path tempPath = filePickerInternals.currentDir.append(filePickerInternals.newDir);
 					const std::string newDirPath = tempPath.string();
 					makeDirectory(newDirPath);
 					shouldUpdate = true;
@@ -298,7 +300,7 @@ namespace ImGui {
 				// Detect if the directory is pointing to a windows volume.
 				if (newPath.size() == 4 && newPath[1] == ':' && newPath[2] == '/' && newPath[3] == '/') {
 					// In this case overwrite the current path.
-					filePickerInternals.currentDir = boost::filesystem::canonical(boost::filesystem::path(newPath));
+					filePickerInternals.currentDir = fs::canonical(fs::path(newPath));
 				} else if (!newPath.empty()) {
 					filePickerInternals.currentDir.append(newPath);
 				}
