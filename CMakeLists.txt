@@ -11,9 +11,10 @@ endif()
 SET(CMAKE_INSTALL_PREFIX ${PROJECT_BINARY_DIR})
 SET(EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR}/bin)
 SET(LIBRARY_OUTPUT_PATH ${CMAKE_BINARY_DIR}/lib)
-set(CMAKE_PREFIX_PATH "${CMAKE_CURRENT_LIST_DIR}/external/install/lib/cmake/;${CMAKE_CURRENT_LIST_DIR}/external/install/lib/pkgconfig;${CMAKE_CURRENT_LIST_DIR}/external/install/share/cmake/HSPlasma/")
+set(CMAKE_PREFIX_PATH "${CMAKE_CURRENT_LIST_DIR}/external/install/lib/cmake/;${CMAKE_CURRENT_LIST_DIR}/external/install/lib/pkgconfig;${CMAKE_CURRENT_LIST_DIR}/external/install/share/pkgconfig;${CMAKE_CURRENT_LIST_DIR}/external/install;${CMAKE_CURRENT_LIST_DIR}/external/install/share/cmake/HSPlasma/")
 
 # Dependencies
+find_package(OpenGL REQUIRED)
 find_package(PNG REQUIRED)
 find_package(HSPlasma REQUIRED)
 find_package(glfw3 REQUIRED)
@@ -40,6 +41,8 @@ add_executable(PrpViewer ${SOURCE_FILES})
 
 target_include_directories(PrpViewer PUBLIC ${HSPlasma_INCLUDE_DIRS} ${CMAKE_CURRENT_LIST_DIR}/external/install/include ${PNG_PNG_INCLUDE_DIR})
 
-target_link_libraries(PrpViewer HSPlasma glfw ${PNG_LIBRARIES} ${STRING_THEORY_LIBRARIES}) 
+target_link_libraries(PrpViewer HSPlasma glfw ${PNG_LIBRARIES} ${STRING_THEORY_LIBRARIES} ${OPENGL_LIBRARIES}) 
+
+set_target_properties(PrpViewer PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "$(OutDir)")
 
 install(TARGETS PrpViewer RUNTIME DESTINATION bin)
