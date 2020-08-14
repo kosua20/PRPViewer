@@ -28,8 +28,8 @@ cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="../install/" ../zlib/
 cmake --build ./ --config Release
 cmake --install ./
 cd ..
-rm install/bin/zlib.dll
-rm install/lib/zlib.lib
+del install\bin\zlib.dll
+del install\lib\zlib.lib
 
 mkdir libpng_build
 cd libpng_build
