@@ -1,6 +1,8 @@
 # PRPViewer
 
-This is a realtime viewer for Uru and Myst V game assets. It relies on the open-sourced Plasma engine to load levels and extract enough information to perform realtime rendering. This project depends on glfw and libhsplasma via Cmake, and was only tested on macOS. It should build on Windows and Linux with a bit of manual intervention in the build files. You will also need most of the dependencies from the Plasma engine, as listed [here](https://github.com/H-uru/libhsplasma)
+This is a realtime viewer for Uru and Myst V game assets. It relies on the open-sourced Plasma engine to load levels and extract enough information to perform realtime rendering. 
+
+This project was tested on Windows and macOS. After cloning the repository, run `configure.bat` or `configure.sh` depending on your environment to build and setup all dependencies. You can then use Cmake to generate the main project from the repository root.
 
 More information in this series of blog posts:
 
