@@ -15,7 +15,7 @@
 
 /// Singleton.
 Resources& Resources::manager(){
-	static Resources* res = new Resources("../../../resources");
+	static Resources* res = new Resources("../../resources");
 	return *res;
 }
 
